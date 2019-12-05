@@ -29,7 +29,7 @@
 
 
 /* If defined, global variables will be used, otherwise CANopen objects will
-   be generated with calloc(). */
+   be generated with COcalloc(). */
 /* #define CO_USE_GLOBALS */
 
 /* If defined, the user provides an own implemetation for calculating the
@@ -900,6 +900,8 @@ bool_t CO_process_SYNC(
             break;
         case 2:     //outside SYNC window
             CO_CANclearPendingSyncPDOs(CO_this->CANmodule[0]);
+            break;
+        default:
             break;
     }
 
