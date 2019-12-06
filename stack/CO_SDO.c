@@ -1451,7 +1451,6 @@ int8_t CO_SDO_process(
             SDO->state = CO_SDO_ST_IDLE;
             break;
         }
-        
         case CO_SDO_ST_IDLE:
         {
             /* Nothing to do it seems */

@@ -149,26 +149,71 @@
 #endif
 #endif
 
-/* These declarations here are needed in the case the switches for the project 
-    change the visibility in the headers in a way that the compiler doesn't see an declaration anymore */
-
 #if CO_NO_LSS_SERVER == 0 /* LSS Server means LSS slave */
-
+/**
+ * Allocate and initialize memory for CANopen object
+ *
+ * Function must be called in the communication reset section.
+ *
+ * @return #CO_ReturnError_t: CO_ERROR_NO, CO_ERROR_ILLEGAL_ARGUMENT,
+ * CO_ERROR_OUT_OF_MEMORY
+ */
 CO_ReturnError_t CO_new(void);
 
+
+/**
+ * Initialize CAN driver
+ *
+ * Function must be called in the communication reset section.
+ *
+ * @param CANdriverState Pointer to the CAN module, passed to CO_CANmodule_init().
+ * @param bitRate CAN bit rate.
+ * @return #CO_ReturnError_t: CO_ERROR_NO, CO_ERROR_ILLEGAL_ARGUMENT,
+ * CO_ERROR_ILLEGAL_BAUDRATE, CO_ERROR_OUT_OF_MEMORY
+ */
 CO_ReturnError_t CO_CANinit(
         void                   *CANdriverState,
         uint16_t                bitRate);
 
+
+/**
+ * Initialize CANopen LSS slave
+ *
+ * Function must be called in the communication reset section.
+ *
+ * @param nodeId Node ID of the CANopen device (1 ... 127) or CO_LSS_NODE_ID_ASSIGNMENT
+ * @param bitRate CAN bit rate.
+ * @return #CO_ReturnError_t: CO_ERROR_NO, CO_ERROR_ILLEGAL_ARGUMENT
+ */
 CO_ReturnError_t CO_LSSinit(
         uint8_t                 nodeId,
         uint16_t                bitRate);
 
+
+/**
+ * Initialize CANopen stack.
+ *
+ * Function must be called in the communication reset section.
+ *
+ * @param nodeId Node ID of the CANopen device (1 ... 127).
+ * @return #CO_ReturnError_t: CO_ERROR_NO, CO_ERROR_ILLEGAL_ARGUMENT
+ */
 CO_ReturnError_t CO_CANopenInit(
         uint8_t                 nodeId);
 
 #else /* CO_NO_LSS_SERVER == 0 */
-
+/**
+ * Initialize CANopen stack.
+ *
+ * Function must be called in the communication reset section.
+ *
+ * @param CANdriverState Pointer to the user-defined CAN base structure, passed to CO_CANmodule_init().
+ * @param nodeId Node ID of the CANopen device (1 ... 127).
+ * @param bitRate CAN bit rate.
+ *
+ * @return #CO_ReturnError_t: CO_ERROR_NO, CO_ERROR_ILLEGAL_ARGUMENT,
+ * CO_ERROR_OUT_OF_MEMORY, CO_ERROR_ILLEGAL_BAUDRATE
+ */
 CO_ReturnError_t CO_init(
         void                   *CANdriverState,
         uint8_t                 nodeId,

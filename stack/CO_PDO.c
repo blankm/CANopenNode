@@ -839,6 +839,7 @@ uint8_t CO_TPDOisCOS(CO_TPDO_t *TPDO){
         case 3: if(*(--pPDOdataByte) != **(--ppODdataByte) && (TPDO->sendIfCOSFlags&0x04)) return 1; // fallthrough
         case 2: if(*(--pPDOdataByte) != **(--ppODdataByte) && (TPDO->sendIfCOSFlags&0x02)) return 1; // fallthrough
         case 1: if(*(--pPDOdataByte) != **(--ppODdataByte) && (TPDO->sendIfCOSFlags&0x01)) return 1; // fallthrough
+        default: break;
     }
 
     return 0;
