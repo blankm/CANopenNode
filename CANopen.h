@@ -87,6 +87,9 @@ extern "C" {
 #if CO_NO_SDO_CLIENT != 0
     #include "CO_SDOmaster.h"
 #endif
+#ifdef CO_NO_TRACE
+#define CO_NO_TRACE 0
+#endif
 #if CO_NO_TRACE > 0
     #include "CO_trace.h"
 #endif

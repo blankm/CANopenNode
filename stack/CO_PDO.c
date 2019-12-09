@@ -858,6 +858,7 @@ uint8_t CO_TPDOisCOS(CO_TPDO_t *TPDO){
         case 3: if(*(--pPDOdataByte) != **(--ppODdataByte) && (TPDO->sendIfCOSFlags&0x04)) return 1;
         case 2: if(*(--pPDOdataByte) != **(--ppODdataByte) && (TPDO->sendIfCOSFlags&0x02)) return 1;
         case 1: if(*(--pPDOdataByte) != **(--ppODdataByte) && (TPDO->sendIfCOSFlags&0x01)) return 1;
+        default: break;
     }
 
     return 0;
@@ -948,7 +949,9 @@ void CO_RPDO_process(CO_RPDO_t *RPDO, bool_t syncWas){
             for(; i>0; i--) {
                 **(ppODdataByte++) = *(pPDOdataByte++);
             }
+#ifdef RPDO_CALLS_EXTENSION
             update = true;
+#endif
         }
 #ifdef RPDO_CALLS_EXTENSION
         if(update==true && RPDO->SDO->ODExtensions){

@@ -49,7 +49,7 @@
 
 
 /* If defined, global variables will be used, otherwise CANopen objects will
-   be generated with calloc(). */
+   be generated with COcalloc(). */
 /* #define CO_USE_GLOBALS */
 
 /* If defined, the user provides an own implemetation for calculating the
@@ -228,8 +228,13 @@ CO_ReturnError_t CO_init(
                 case CO_NMT_RESET_COMMUNICATION:
                     CO_this->NMT->resetCommand = CO_RESET_COMM;
                     break;
+                default:
+                    CO_UNLOCK_NMT();
+                    return 0; /* No valid command to be sent, return silent */
             }
         }
+
+        CO_UNLOCK_NMT();
 
         return CO_CANsend(CO_this->CANmodule[0], NMTM_txBuff); /* 0 = success */
     }
@@ -879,6 +884,8 @@ bool_t CO_process_SYNC_RPDO(
             break;
         case 2:     //outside SYNC window
             CO_CANclearPendingSyncPDOs(CO_this->CANmodule[0]);
+            break;
+        default:
             break;
     }
 
