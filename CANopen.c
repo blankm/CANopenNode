@@ -237,7 +237,7 @@ CO_ReturnError_t CO_init(
         /* Protect access to NMT operatingState and resetCommand */
         CO_LOCK_NMT();
 
-        CO_ReturnError_t error = CO_ERROR_NO
+        CO_ReturnError_t error = CO_ERROR_NO;
 
         /* Apply NMT command also to this node, if set so. */
         if(nodeID == 0 || nodeID == CO_this->NMT->nodeId){
