@@ -205,6 +205,8 @@ CO_ReturnError_t CO_init(
         NMTM_txBuff->data[0] = command;
         NMTM_txBuff->data[1] = nodeID;
 
+        CO_ReturnError_t error = CO_ERROR_NO;
+
         /* Protect access to NMT operatingState and resetCommand */
         CO_LOCK_NMT();
 
@@ -229,14 +231,21 @@ CO_ReturnError_t CO_init(
                     CO_this->NMT->resetCommand = CO_RESET_COMM;
                     break;
                 default:
-                    CO_UNLOCK_NMT();
-                    return 0; /* No valid command to be sent, return silent */
+                    error = CO_ERROR_ILLEGAL_ARGUMENT;
+                    break;
+
             }
         }
 
         CO_UNLOCK_NMT();
 
-        return CO_CANsend(CO_this->CANmodule[0], NMTM_txBuff); /* 0 = success */
+        if(error == CO_ERROR_NO)
+            return CO_CANsend(CO_this->CANmodule[0], NMTM_txBuff); /* 0 = success */
+        else
+        {
+            return error;
+        }
+        
     }
 #endif
 
