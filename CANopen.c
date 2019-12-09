@@ -189,7 +189,10 @@ CO_ReturnError_t CO_init(
         NMTM_txBuff->data[0] = command;
         NMTM_txBuff->data[1] = nodeID;
 
-        CO_ReturnError_t error = CO_ERROR_NO;
+        /* Protect access to NMT operatingState and resetCommand */
+        CO_LOCK_NMT();
+
+        CO_ReturnError_t error = CO_ERROR_NO
 
         /* Apply NMT command also to this node, if set so. */
         if(nodeID == 0 || nodeID == CO_this->NMT->nodeId){
@@ -219,12 +222,12 @@ CO_ReturnError_t CO_init(
         }
 
         if(error == CO_ERROR_NO)
-            return CO_CANsend(CO_this->CANmodule[0], NMTM_txBuff); /* 0 = success */
-        else
         {
-            return error;
+            error = CO_CANsend(CO_this->CANmodule[0], NMTM_txBuff); /* 0 = success */
         }
-        
+        CO_UNLOCK_NMT();
+			
+		return error;
     }
 #endif
 

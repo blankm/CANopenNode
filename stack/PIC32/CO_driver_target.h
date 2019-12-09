@@ -60,6 +60,9 @@ extern unsigned int CO_interruptStatus;
 #define CO_LOCK_OD()            CO_interruptStatus = __builtin_disable_interrupts()
 #define CO_UNLOCK_OD()          if(CO_interruptStatus & 0x00000001) {__builtin_enable_interrupts();}
 
+    #define CO_LOCK_NMT()           CO_interruptStatus = __builtin_disable_interrupts()
+    #define CO_UNLOCK_NMT()         if(CO_interruptStatus & 0x00000001) {__builtin_enable_interrupts();}
+
 
 /* Data types */
 /* int8_t to uint64_t are defined in stdint.h */

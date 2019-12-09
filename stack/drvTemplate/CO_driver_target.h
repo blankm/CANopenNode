@@ -159,14 +159,18 @@ extern "C" {
  * CO_SYNC_initCallback() function.
  * @{
  */
-#define CO_LOCK_CAN_SEND()  /**< Lock critical section in CO_CANsend() */
-#define CO_UNLOCK_CAN_SEND()/**< Unlock critical section in CO_CANsend() */
+	#define CO_LOCK_CAN_SEND()  /**< Lock critical section in CO_CANsend() */
+	#define CO_UNLOCK_CAN_SEND()/**< Unlock critical section in CO_CANsend() */
 
-#define CO_LOCK_EMCY()      /**< Lock critical section in CO_errorReport() or CO_errorReset() */
-#define CO_UNLOCK_EMCY()    /**< Unlock critical section in CO_errorReport() or CO_errorReset() */
+	#define CO_LOCK_EMCY()      /**< Lock critical section in CO_errorReport() or CO_errorReset() */
+	#define CO_UNLOCK_EMCY()    /**< Unlock critical section in CO_errorReport() or CO_errorReset() */
 
-#define CO_LOCK_OD()        /**< Lock critical section when accessing Object Dictionary */
-#define CO_UNLOCK_OD()      /**< Unock critical section when accessing Object Dictionary */
+	#define CO_LOCK_OD()        /**< Lock critical section when accessing Object Dictionary */
+	#define CO_UNLOCK_OD()      /**< Unock critical section when accessing Object Dictionary */
+
+    #define CO_LOCK_NMT()       /**< Lock critical section when accessing NMT Object asyncronous */
+    #define CO_UNLOCK_NMT()     /**< Lock critical section when accessing NMT Object asyncronous */
+
 /** @} */
 
 /**

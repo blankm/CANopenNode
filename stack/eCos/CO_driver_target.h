@@ -107,6 +107,9 @@ extern "C"
 #define CO_LOCK_OD()            cyg_scheduler_lock()
 #define CO_UNLOCK_OD()          cyg_scheduler_unlock()
 
+    #define CO_LOCK_NMT()           cyg_scheduler_lock()
+    #define CO_UNLOCK_NMT()         cyg_scheduler_unlock()
+
 
 
 /* Data types */
