@@ -58,9 +58,9 @@ static CO_HBconsNode_t *CO_HBcons_monitoredNodes;
 #define CO_TRACE_BUFFER_SIZE_FIXED 100
 #endif
 
-static uint32_t *CO_traceTimeBuffers;
-static int32_t *CO_traceValueBuffers;
-static uint32_t *CO_traceBufferSize;
+// static uint32_t *CO_traceTimeBuffers;
+// static int32_t *CO_traceValueBuffers;
+// static uint32_t *CO_traceBufferSize;
 
 /* Verify features from CO_OD *************************************************/
     /* generate error, if features are not correctly configured for this project */
@@ -432,7 +432,7 @@ CO_ReturnError_t CO_new(CO_Context_t *context)
         CO_CANmodule_rxArray0               = (CO_CANrx_t *)        COcalloc(norxmsgs, sizeof(CO_CANrx_t));
         CO_CANmodule_txArray0               = (CO_CANtx_t *)        COcalloc(notxmsgs, sizeof(CO_CANtx_t));
         /* Attention, MUST BE ALLOCATED AT ONCE HERE! *
-         * otherwise it can't be accessed like an array atferwards! */
+         * otherwise it can't be accessed like an array afterwards! */
         CO->SDO                             = (CO_SDO_t *)          COcalloc(context->features.CO_NO_SDO_SERVER, sizeof(CO_SDO_t));        
         CO_SDO_ODExtensions                 = (CO_OD_extension_t*)  COcalloc(context->numberOfODElements, sizeof(CO_OD_extension_t));
         CO->em                              = (CO_EM_t *)           COcalloc(1, sizeof(CO_EM_t));
@@ -468,22 +468,89 @@ CO_ReturnError_t CO_new(CO_Context_t *context)
         {
             CO->SDOclient                   = NULL;
         }
+
+        uint32_t neededBuffersize = 0;
+
         if(context->features.CO_NO_TRACE > 0)
         {
-            /* Attention, MUST BE ALLOCATED AT ONCE HERE! *
-             * otherwise it can't be accessed like an array atferwards! */ 
+
+            /* For each config'd trace in OD, we need a bufferarray of int32_t(values), uint32_t(time) and one place to store the size */
+            /* Since we don't know the number of traces in advance, we can't assign a array of pointers */
+            /* Thus there is is just one pointer of each type, that points to an allocated array of pointers which then point to each traces information */
+
+            
+            /* So first we need the number of traces to allocate the number of pointers. */
+            /* Then we iterate over each traceConfig to get the traces size to allocate memory for each trace and assign the trace's pointers and size information */
+
             CO->trace                       = (CO_trace_t *)        COcalloc(context->features.CO_NO_TRACE, sizeof(CO_trace_t));
-            CO_traceTimeBuffers             = (uint32_t *)          COcalloc(context->features.CO_NO_TRACE, sizeof(uint32_t) * CO_TRACE_BUFFER_SIZE_FIXED);
-            CO_traceValueBuffers            = (int32_t *)           COcalloc(context->features.CO_NO_TRACE, sizeof(int32_t) * CO_TRACE_BUFFER_SIZE_FIXED);
-            for (i = 0; i < (uint16_t)context->features.CO_NO_TRACE; i++)
+
+            /* We now have the trace contexts in memory. So there is no need to save external pointers somewhere */
+            /* We can store the size directly in the trace's contexts */
+            /* We keep counting the needed amount of tracebuffers (value and time) to allocate the memory at the end. */
+            /* During trace init the memory is taken then (pointers are adjusted as needed from size information in trace contexts) */
+
+            /* Go on only if assignment worked */
+            if (CO->trace != NULL)
             {
-                if (CO_traceTimeBuffers[i] != NULL && CO_traceValueBuffers[i] != NULL)
+                /* Get trace buffer sizes out of OD */
+                /* OD_traceConfig[i].size */
+                /*2301[2], Data Type: OD_traceConfig_t, Array[2] */
+
+                for (i = 0; i < (uint16_t)context->features.CO_NO_TRACE; i++)
                 {
-                    CO_traceBufferSize[i] = CO_TRACE_BUFFER_SIZE_FIXED; //FIXME: OD_traceConfig[i].size 
+                    uint16_t wantedIndex = 0x2301 + i;
+
+                    /* Poll over OD to find OD_traceConfig[i] */
+                    for (uint16_t j = 0; j < context->numberOfODElements; j++)
+                    {
+                        if (context->usedOD[j].index == wantedIndex && context->usedOD[j].maxSubIndex > 0 && context->usedOD[j].attribute == 0 && context->usedOD[j].length == 0 && context->usedOD[j].pData != NULL)
+                        {
+                            /* Looks like this is the wanted record */
+                            CO_OD_entryRecord_t *recP = (CO_OD_entryRecord_t *)context->usedOD[j].pData;
+
+                            if (recP[0].pData != NULL)
+                            {
+                                uint8_t maxSub = *((uint8_t *)recP[0].pData);
+
+                                if (maxSub == 8) // This is the expected size
+                                {
+                                    if (recP[1].pData != NULL && recP[1].length == 4)
+                                    {
+                                        uint32_t thisBuffersize = *((uint32_t *)recP[1].pData); // subindex 1 holds needed size of the trace
+                                        neededBuffersize += thisBuffersize;
+                                        CO->trace[i].bufferSize = thisBuffersize;
+                                    }
+                                }
+                                /* Exit early, we're done here (even if data is not valid)*/
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // Now we've got the number of buffers we need for all traces
+                uint32_t *traceTimeBuffers = (uint32_t *)COcalloc(neededBuffersize, sizeof(uint32_t));
+                int32_t *traceValueBuffers = (int32_t *)COcalloc(neededBuffersize, sizeof(int32_t));
+
+                // Check if assignment was okay */
+                if (traceTimeBuffers == NULL || traceValueBuffers == NULL)
+                {
+                    // Free stuff and mark it as faulty
+                    COfree(traceValueBuffers);
+                    COfree(traceTimeBuffers);
+                    COfree(CO->trace);
                 }
                 else
                 {
-                    CO_traceBufferSize[i] = 0;
+                    /* Now assign the pointers */
+                    /* For that we count upwards */
+                    for (i = 0; i < (uint16_t)context->features.CO_NO_TRACE; i++)
+                    {
+                        CO->trace[i].timeBuffer = traceTimeBuffers;
+                        CO->trace[i].valueBuffer = traceValueBuffers;
+                        traceTimeBuffers += CO->trace[i].bufferSize;
+                        traceValueBuffers += CO->trace[i].bufferSize;
+                    }
                 }
             }
         } 
@@ -519,7 +586,7 @@ CO_ReturnError_t CO_new(CO_Context_t *context)
     CO_memoryUsed += sizeof(CO_SDOclient_t) * (uint32_t)context->features.CO_NO_SDO_CLIENT;
     
     CO_memoryUsed += sizeof(CO_trace_t) * (uint32_t)context->features.CO_NO_TRACE;
-    CO_memoryUsed += (uint32_t)context->features.CO_NO_TRACE * 2 * sizeof(int32_t) * CO_TRACE_BUFFER_SIZE_FIXED;
+    CO_memoryUsed += (sizeof(int32_t) + sizeof(uint32_t)) * neededBuffersize;
     
 
     errCnt = 0;
@@ -1391,6 +1458,7 @@ CO_ReturnError_t CO_CANopenInit(
                 return CO_ERROR_DATA_CORRUPT;
             }
 
+            XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX; // Fix the pointer stuff below
             CO_trace_init(
                 CO->trace[i],
                 CO->SDO[0],
@@ -1454,11 +1522,12 @@ void CO_delete(
     CO_CANsetConfigurationMode(CANdriverState);
     CO_CANmodule_disable(CO->CANmodule[0]);
 
-    for (i = 0; i < (uint16_t)context->features.CO_NO_TRACE; i++)
+    // Cleaning the trace stuff is easy since all is allocated at once and thus can be freed at once
+    if(context->features.CO_NO_TRACE > 0)
     {
-        COfree(CO->trace[i]);
-        COfree(CO_traceTimeBuffers[i]);
-        COfree(CO_traceValueBuffers[i]);
+        COfree(CO->trace[0].timeBuffer);
+        COfree(CO->trace[0].valueBuffer);
+        COfree(CO->trace);
     }
 
     for (i = 0; i < (uint16_t)context_features.CO_NO_SDO_CLIENT; i++)
