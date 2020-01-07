@@ -1457,25 +1457,24 @@ CO_ReturnError_t CO_CANopenInit(
             {
                 return CO_ERROR_DATA_CORRUPT;
             }
-
-            XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX; // Fix the pointer stuff below
+            
             CO_trace_init(
-                CO->trace[i],
-                CO->SDO[0],
+                CO->trace[i], //ok
+                CO->SDO[0], //ok
                 *((uint8_t *)recP[2].pData),
-                CO_traceTimeBuffers[i],
-                CO_traceValueBuffers[i],
-                CO_traceBufferSize[i],
-                ((uint32_t *)recP[5].pData),
-                ((uint8_t *)recP[6].pData),
-                ((uint8_t *)recP[7].pData),
-                ((uint32_t *)recP[8].pData),
-                ((int32_t *)rec[2].pData),
-                ((int32_t *)rec[3].pData),
-                ((int32_t *)rec[4].pData),
-                ((uint32_t *)rec[6].pData),
-                OD_INDEX_TRACE_CONFIG + i,
-                OD_INDEX_TRACE + i);
+                CO->trace[i].timeBuffer, //ok
+                CO->trace[i].valueBuffer, //ok
+                CO->trace[i].bufferSize, //ok
+                ((uint32_t *)recP[5].pData), /* traceConfig[i].map       == idx 2301ff, subindex 5, uint32 */
+                ((uint8_t *)recP[6].pData),  /* traceConfig[i].format    == idx 2301ff, subindex 6, uint8  */
+                ((uint8_t *)recP[7].pData),  /* traceConfig[i].trigger   == idx 2301ff, subindex 7, uint8  */
+                ((uint32_t *)recP[8].pData), /* traceConfig[i].threshold == idx 2301ff, subindex 8, int32  */
+                ((int32_t *)rec[2].pData),   /* trace[i].value           == idx 2401ff, subindex 2, int32  */
+                ((int32_t *)rec[3].pData),   /* trace[i].min             == idx 2401ff, subindex 3, int32  */
+                ((int32_t *)rec[4].pData),   /* trace[i].max             == idx 2401ff, subindex 4, int32  */
+                ((uint32_t *)rec[6].pData),  /* trace[i].triggerTime     == idx 2401ff, subindex 6, uint32 */
+                OD_INDEX_TRACE_CONFIG + i, /* This is a define in CO_trace.h which doesn't need altering, it is 0x2301 */
+                OD_INDEX_TRACE + i);       /* This is a define in CO_trace.h which doesn't need altering, it is 0x2401 */
         }
     }
 
