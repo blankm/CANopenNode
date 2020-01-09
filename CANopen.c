@@ -84,13 +84,13 @@ static inline uint16_t CO_RXCAN_NO_MSGS(CO_Context_t * context)
 {
     //(1+CO_NO_SYNC+CO_NO_EMERGENCY+CO_NO_TIME+CO_NO_RPDO+CO_NO_SDO_SERVER+CO_NO_SDO_CLIENT+CO_NO_HB_CONS)
     uint16_t rxcnt = 1;
-    rxcnt += context->features.CO_NO_SYNC;
-    rxcnt += context->features.CO_NO_EMERGENCY;
-    rxcnt += context->features.CO_NO_TIME;
-    rxcnt += context->features.CO_NO_RPDO;
-    rxcnt += context->features.CO_NO_SDO_SERVER;
-    rxcnt += context->features.CO_NO_SDO_CLIENT;
-    rxcnt += context->features.CO_NO_HB_CONS;
+    rxcnt += context->features->CO_NO_SYNC;
+    rxcnt += context->features->CO_NO_EMERGENCY;
+    rxcnt += context->features->CO_NO_TIME;
+    rxcnt += context->features->CO_NO_RPDO;
+    rxcnt += context->features->CO_NO_SDO_SERVER;
+    rxcnt += context->features->CO_NO_SDO_CLIENT;
+    rxcnt += context->features->CO_NO_HB_CONS;
     return rxcnt;
 }
 
@@ -98,16 +98,16 @@ static inline uint16_t CO_TXCAN_NO_MSGS(CO_Context_t * context)
 {
     //(CO_NO_NMT_MASTER+CO_NO_SYNC+CO_NO_EMERGENCY+CO_NO_TIME+CO_NO_TPDO+CO_NO_SDO_SERVER+CO_NO_SDO_CLIENT+CO_NO_HB_PROD+CO_NO_LSS_SERVER+CO_NO_LSS_CLIENT)
     uint16_t txcnt = 0;
-    rxcnt += context->features.CO_NO_NMT_MASTER;
-    rxcnt += context->features.CO_NO_SYNC;
-    rxcnt += context->features.CO_NO_EMERGENCY;
-    rxcnt += context->features.CO_NO_TIME;
-    rxcnt += context->features.CO_NO_TPDO;
-    rxcnt += context->features.CO_NO_SDO_SERVER;
-    rxcnt += context->features.CO_NO_SDO_CLIENT;
-    rxcnt += context->features.CO_NO_HB_PROD;
-    rxcnt += context->features.CO_NO_LSS_SERVER;
-    rxcnt += context->features.CO_NO_LSS_CLIENT;
+    rxcnt += context->features->CO_NO_NMT_MASTER;
+    rxcnt += context->features->CO_NO_SYNC;
+    rxcnt += context->features->CO_NO_EMERGENCY;
+    rxcnt += context->features->CO_NO_TIME;
+    rxcnt += context->features->CO_NO_TPDO;
+    rxcnt += context->features->CO_NO_SDO_SERVER;
+    rxcnt += context->features->CO_NO_SDO_CLIENT;
+    rxcnt += context->features->CO_NO_HB_PROD;
+    rxcnt += context->features->CO_NO_LSS_SERVER;
+    rxcnt += context->features->CO_NO_LSS_CLIENT;
     return txcnt;
 }
 
@@ -116,35 +116,68 @@ CO_ReturnError_t CO_verifyFeatures(CO_Context_t * context)
 {
     /* Check if all features make sense */
     uint8_t errs = 0;
-    if(context->features.CO_NO_SYNC != 1)
+    if(context->features->CO_NO_SYNC != 1)
         errs++;
-    if(context->features.CO_NO_NMT_MASTER > 1)
+    if(context->features->CO_NO_NMT_MASTER > 1)
         errs++;
-    if(context->features.CO_NO_EMERGENCY != 1)
+    if(context->features->CO_NO_EMERGENCY != 1)
         errs++;
-    if(context->features.CO_NO_SDO_SERVER == 0)
+    if(context->features->CO_NO_SDO_SERVER == 0)
         errs++;
-    if(context->features.CO_NO_SDO_CLIENT > 128)
+    if(context->features->CO_NO_SDO_CLIENT > 128)
         errs++;
-    if(context->features.CO_NO_RPDO < 1 || context->features.CO_NO_RPDO > 0x200)
+    if(context->features->CO_NO_RPDO < 1 || context->features->CO_NO_RPDO > 0x200)
         errs++;
-    if(context->features.CO_NO_TPDO < 1 || context->features.CO_NO_TPDO > 0x200)
+    if(context->features->CO_NO_TPDO < 1 || context->features->CO_NO_TPDO > 0x200)
         errs++;
-    if(context->features.CO_NO_LSS_SERVER > 1)
+    if(context->features->CO_NO_LSS_SERVER > 1)
         errs++;
-    if(context->features.CO_NO_LSS_CLIENT > 1)
+    if(context->features->CO_NO_LSS_CLIENT > 1)
         errs++;
-    if(context->features.CO_NO_TIME > 1)
+    if(context->features->CO_NO_TIME > 1)
         errs++;
     // TODO: I guess we don't allow LSS Server and Client at the same time, I guess different contexts are needed for different roles
-    if((context->features.CO_NO_LSS_CLIENT > 0) && (context->features.CO_NO_LSS_SERVER > 0))
+    if((context->features->CO_NO_LSS_CLIENT > 0) && (context->features->CO_NO_LSS_SERVER > 0))
         errs++;
+
+    /* Check if array size ODL_consumerHeartbeatTime_arrayLength == 0 */
+    /* This is equivalent to */
+    if(context->features->CO_NO_HB_CONS == 0)
+    {
+        errs++;
+    }
     
     /* Now comes the more complicated part, we have to check inside OD */
-    /* consumerHeartBeatTime Array size */
-    // TODO: Do this!!
-    /* errorStatusBits string length */
-    // TODO: Do this!!
+    
+    /* errorStatusBits string length, OCTET_STRING, len = 10, idx 0x2100 */
+    /* Poll over OD to find errorStatusBits */
+    uint16_t j;
+    for (j = 0; j < context->numberOfODElements; j++)
+    {
+        if (context->usedOD[j].index == 0x2100 && context->usedOD[j].maxSubIndex == 0 && context->usedOD[j].attribute != 0 && context->usedOD[j].pData != NULL)
+        {
+            /* Looks like this is the wanted array (it is at least a variable) */
+            /* Check if the found index is a variable with len >= 10 */
+
+            if (context->usedOD[j].length < 10)
+            {
+                // The errorStatusBits is too short
+                errs++;
+            }
+            else
+            {
+                // Nothing to do
+            }
+            /* Exit early, we're done here (even if data is not valid)*/
+            break;
+        }
+    }
+    /* Check if errorStatusBits was found, othwerise the OD is corrupt */
+    if( j >= context->numberOfODElements)
+    {
+        // errorStatusBits couldn't be found
+        errs++;
+    }
 
     if(errs > 0)
         return CO_ERROR_PARAMETERS;
@@ -366,20 +399,19 @@ CO_ReturnError_t CO_new(CO_Context_t *context)
     if(CO_verifyFeatures(context) != CO_ERROR_NO)
         return CO_ERROR_PARAMETERS;
 
-    // TODO: Address these!
+    // TODO: If these checks are really needed for generated code, then please add!
     /* Verify parameters from CO_OD */
-    if(   sizeof(OD_TPDOCommunicationParameter_t) != sizeof(CO_TPDOCommPar_t)
-       || sizeof(OD_TPDOMappingParameter_t) != sizeof(CO_TPDOMapPar_t)
-       || sizeof(OD_RPDOCommunicationParameter_t) != sizeof(CO_RPDOCommPar_t)
-       || sizeof(OD_RPDOMappingParameter_t) != sizeof(CO_RPDOMapPar_t))
-    {
-        return CO_ERROR_PARAMETERS;
-    }
-
+    // if(   sizeof(OD_TPDOCommunicationParameter_t) != sizeof(CO_TPDOCommPar_t)
+    //    || sizeof(OD_TPDOMappingParameter_t) != sizeof(CO_TPDOMapPar_t)
+    //    || sizeof(OD_RPDOCommunicationParameter_t) != sizeof(CO_RPDOCommPar_t)
+    //    || sizeof(OD_RPDOMappingParameter_t) != sizeof(CO_RPDOMapPar_t))
+    // {
+    //     return CO_ERROR_PARAMETERS;
+    // }
     
-    if(sizeof(OD_SDOClientParameter_t) != sizeof(CO_SDOclientPar_t)){
-        return CO_ERROR_PARAMETERS;
-    }
+    // if(sizeof(OD_SDOClientParameter_t) != sizeof(CO_SDOclientPar_t)){
+    //     return CO_ERROR_PARAMETERS;
+    // }
     
 
     /* Initialize CANopen object */
@@ -433,7 +465,7 @@ CO_ReturnError_t CO_new(CO_Context_t *context)
         CO_CANmodule_txArray0               = (CO_CANtx_t *)        COcalloc(notxmsgs, sizeof(CO_CANtx_t));
         /* Attention, MUST BE ALLOCATED AT ONCE HERE! *
          * otherwise it can't be accessed like an array afterwards! */
-        CO->SDO                             = (CO_SDO_t *)          COcalloc(context->features.CO_NO_SDO_SERVER, sizeof(CO_SDO_t));        
+        CO->SDO                             = (CO_SDO_t *)          COcalloc(context->features->CO_NO_SDO_SERVER, sizeof(CO_SDO_t));        
         CO_SDO_ODExtensions                 = (CO_OD_extension_t*)  COcalloc(context->numberOfODElements, sizeof(CO_OD_extension_t));
         CO->em                              = (CO_EM_t *)           COcalloc(1, sizeof(CO_EM_t));
         CO->emPr                            = (CO_EMpr_t *)         COcalloc(1, sizeof(CO_EMpr_t));
@@ -450,7 +482,7 @@ CO_ReturnError_t CO_new(CO_Context_t *context)
         {
             CO->LSSslave                    = NULL;
         }
-        if(context->features.CO_NO_LSS_CLIENT > 0)
+        if(context->features->CO_NO_LSS_CLIENT > 0)
         {
             CO->LSSmaster                   = (CO_LSSmaster_t *)    COcalloc(1, sizeof(CO_LSSmaster_t));
         }
@@ -458,11 +490,11 @@ CO_ReturnError_t CO_new(CO_Context_t *context)
         {
             CO->LSSmaster                   = NULL;
         }
-        if(context->features.CO_NO_SDO_CLIENT > 0)
+        if(context->features->CO_NO_SDO_CLIENT > 0)
         {
             /* Attention, MUST BE ALLOCATED AT ONCE HERE! *
              * otherwise it can't be accessed like an array afterwards! */ 
-            CO->SDOclient                   = (CO_SDOclient_t *)    COcalloc(context->features.CO_NO_SDO_CLIENT, sizeof(CO_SDOclient_t));
+            CO->SDOclient                   = (CO_SDOclient_t *)    COcalloc(context->features->CO_NO_SDO_CLIENT, sizeof(CO_SDOclient_t));
         }
         else
         {
@@ -471,7 +503,7 @@ CO_ReturnError_t CO_new(CO_Context_t *context)
 
         uint32_t neededBuffersize = 0;
 
-        if(context->features.CO_NO_TRACE > 0)
+        if(context->features->CO_NO_TRACE > 0)
         {
 
             /* For each config'd trace in OD, we need a bufferarray of int32_t(values), uint32_t(time) and one place to store the size */
@@ -482,7 +514,7 @@ CO_ReturnError_t CO_new(CO_Context_t *context)
             /* So first we need the number of traces to allocate the number of pointers. */
             /* Then we iterate over each traceConfig to get the traces size to allocate memory for each trace and assign the trace's pointers and size information */
 
-            CO->trace                       = (CO_trace_t *)        COcalloc(context->features.CO_NO_TRACE, sizeof(CO_trace_t));
+            CO->trace                       = (CO_trace_t *)        COcalloc(context->features->CO_NO_TRACE, sizeof(CO_trace_t));
 
             /* We now have the trace contexts in memory. So there is no need to save external pointers somewhere */
             /* We can store the size directly in the trace's contexts */
@@ -496,7 +528,7 @@ CO_ReturnError_t CO_new(CO_Context_t *context)
                 /* OD_traceConfig[i].size */
                 /*2301[2], Data Type: OD_traceConfig_t, Array[2] */
 
-                for (i = 0; i < (uint16_t)context->features.CO_NO_TRACE; i++)
+                for (i = 0; i < (uint16_t)context->features->CO_NO_TRACE; i++)
                 {
                     uint16_t wantedIndex = 0x2301 + i;
 
@@ -544,7 +576,7 @@ CO_ReturnError_t CO_new(CO_Context_t *context)
                 {
                     /* Now assign the pointers */
                     /* For that we count upwards */
-                    for (i = 0; i < (uint16_t)context->features.CO_NO_TRACE; i++)
+                    for (i = 0; i < (uint16_t)context->features->CO_NO_TRACE; i++)
                     {
                         CO->trace[i].timeBuffer = traceTimeBuffers;
                         CO->trace[i].valueBuffer = traceValueBuffers;
@@ -574,18 +606,18 @@ CO_ReturnError_t CO_new(CO_Context_t *context)
                   + sizeof(CO_TPDO_t) * CO_NO_TPDO
                   + sizeof(CO_HBconsumer_t)
                   + sizeof(CO_HBconsNode_t) * CO_NO_HB_CONS;
-    if(context->features.CO_NO_LSS_SERVER == 1)
+    if(context->features->CO_NO_LSS_SERVER == 1)
     {
         CO_memoryUsed += sizeof(CO_LSSslave_t);
     }
   
-    if(context->features.CO_NO_LSS_CLIENT == 1)
+    if(context->features->CO_NO_LSS_CLIENT == 1)
     {
         CO_memoryUsed += sizeof(CO_LSSmaster_t);
     }
-    CO_memoryUsed += sizeof(CO_SDOclient_t) * (uint32_t)context->features.CO_NO_SDO_CLIENT;
+    CO_memoryUsed += sizeof(CO_SDOclient_t) * (uint32_t)context->features->CO_NO_SDO_CLIENT;
     
-    CO_memoryUsed += sizeof(CO_trace_t) * (uint32_t)context->features.CO_NO_TRACE;
+    CO_memoryUsed += sizeof(CO_trace_t) * (uint32_t)context->features->CO_NO_TRACE;
     CO_memoryUsed += (sizeof(int32_t) + sizeof(uint32_t)) * neededBuffersize;
     
 
@@ -612,13 +644,13 @@ CO_ReturnError_t CO_new(CO_Context_t *context)
     }
     if(CO->HBcons                       == NULL) errCnt++;
     if(CO_HBcons_monitoredNodes         == NULL) errCnt++;
-    if(context->features.CO_NO_LSS_SERVER == 1 && \
+    if(context->features->CO_NO_LSS_SERVER == 1 && \
        CO->LSSslave                     == NULL) errCnt++;
-    if(context->features.CO_NO_LSS_CLIENT == 1 && \
+    if(context->features->CO_NO_LSS_CLIENT == 1 && \
        CO->LSSmaster                    == NULL) errCnt++;
-    if(context->features.CO_NO_SDO_CLIENT > 0 && \
+    if(context->features->CO_NO_SDO_CLIENT > 0 && \
        CO->SDOclient                    == NULL) errCnt++;
-    if(context->features.CO_NO_TRACE > 0 && \
+    if(context->features->CO_NO_TRACE > 0 && \
        CO->trace                        == NULL) errCnt++;
     
     if(errCnt != 0) return CO_ERROR_OUT_OF_MEMORY;
@@ -664,22 +696,22 @@ CO_ReturnError_t CO_LSSinit(
 
     // Calculate the LSS msg box (rx&tx)
 
-    uint16_t rxidxcan_LSS = (uint16_t)context->features.CO_NO_HB_CONS + \
-                            (uint16_t)context->features.CO_NO_SDO_CLIENT + \
-                            (uint16_t)context->features.CO_NO_SDO_SERVER + \
-                            context->features.CO_NO_RPDO + \
-                            (uint16_t)context->features.CO_NO_TIME + \
-                            (uint16_t)context->features.CO_NO_EMERGENCY + \
-                            (uint16_t)context->features.CO_NO_SYNC + 1;
+    uint16_t rxidxcan_LSS = (uint16_t)context->features->CO_NO_HB_CONS + \
+                            (uint16_t)context->features->CO_NO_SDO_CLIENT + \
+                            (uint16_t)context->features->CO_NO_SDO_SERVER + \
+                            context->features->CO_NO_RPDO + \
+                            (uint16_t)context->features->CO_NO_TIME + \
+                            (uint16_t)context->features->CO_NO_EMERGENCY + \
+                            (uint16_t)context->features->CO_NO_SYNC + 1;
 
-    uint16_t txidxcan_LSS = (uint16_t)context->features.CO_NO_HB_PROD + \
-                            (uint16_t)context->features.CO_NO_SDO_CLIENT + \
-                            (uint16_t)context->features.CO_NO_SDO_SERVER + \
-                            context->features.CO_NO_TPDO + \
-                            (uint16_t)context->features.CO_NO_TIME + \
-                            (uint16_t)context->features.CO_NO_EMERGENCY + \
-                            (uint16_t)context->features.CO_NO_SYNC + \
-                            (uint16_t)context->features.CO_NO_NMT_MASTER;
+    uint16_t txidxcan_LSS = (uint16_t)context->features->CO_NO_HB_PROD + \
+                            (uint16_t)context->features->CO_NO_SDO_CLIENT + \
+                            (uint16_t)context->features->CO_NO_SDO_SERVER + \
+                            context->features->CO_NO_TPDO + \
+                            (uint16_t)context->features->CO_NO_TIME + \
+                            (uint16_t)context->features->CO_NO_EMERGENCY + \
+                            (uint16_t)context->features->CO_NO_SYNC + \
+                            (uint16_t)context->features->CO_NO_NMT_MASTER;
 
     // Get the device's information out of OD
     lssAddress.identity.vendorID = 0;
@@ -761,16 +793,16 @@ CO_ReturnError_t CO_CANopenInit(
     uint8_t maxSub = 0;
     CO_OD_entryRecord_t *recP = NULL;
 
-    rxidxcan = context->features.CO_NO_RPDO + \
-                (uint16_t)context->features.CO_NO_TIME + \
-                (uint16_t)context->features.CO_NO_EMERGENCY + \
-                (uint16_t)context->features.CO_NO_SYNC + 1;
+    rxidxcan = context->features->CO_NO_RPDO + \
+                (uint16_t)context->features->CO_NO_TIME + \
+                (uint16_t)context->features->CO_NO_EMERGENCY + \
+                (uint16_t)context->features->CO_NO_SYNC + 1;
 
-    txidxcan = context->features.CO_NO_TPDO + \
-                (uint16_t)context->features.CO_NO_TIME + \
-                (uint16_t)context->features.CO_NO_EMERGENCY + \
-                (uint16_t)context->features.CO_NO_SYNC + \
-                (uint16_t)context->features.CO_NO_NMT_MASTER;
+    txidxcan = context->features->CO_NO_TPDO + \
+                (uint16_t)context->features->CO_NO_TIME + \
+                (uint16_t)context->features->CO_NO_EMERGENCY + \
+                (uint16_t)context->features->CO_NO_SYNC + \
+                (uint16_t)context->features->CO_NO_NMT_MASTER;
 
     /*1200[1], Data Type: OD_SDOServerParameter_t, Array[1] */
     /* Poll over OD to find OD_SDOServerParameter */
@@ -791,7 +823,7 @@ CO_ReturnError_t CO_CANopenInit(
         }
     }
 
-    for (i = 0; i < (uint16_t)context->features.CO_NO_SDO_SERVER; i++)
+    for (i = 0; i < (uint16_t)context->features->CO_NO_SDO_SERVER; i++)
     {
         uint32_t COB_IDClientToServer;
         uint32_t COB_IDServerToClient;
@@ -855,7 +887,7 @@ CO_ReturnError_t CO_CANopenInit(
     /* This check is normally not really needed, but I use it as an optimization *
      * since a lot of stack based variables are encapsulated and freed immediately *
      * so on less powerful devices, stack usage is reduced (blankm 20191213) */
-    if (context->features.CO_NO_EMERGENCY > 0) 
+    if (context->features->CO_NO_EMERGENCY > 0) 
     {
         /*2100, Data Type: OCTET_STRING, Array[10] */
         /* Poll over OD to find OD_errorStatusBits */
@@ -912,9 +944,9 @@ CO_ReturnError_t CO_CANopenInit(
             }
         }
 
-        rxidxcan = (uint16_t)context->features.CO_NO_SYNC + 1;
-        txidxcan = (uint16_t)context->features.CO_NO_SYNC +
-                   (uint16_t)context->features.CO_NO_NMT_MASTER;
+        rxidxcan = (uint16_t)context->features->CO_NO_SYNC + 1;
+        txidxcan = (uint16_t)context->features->CO_NO_SYNC +
+                   (uint16_t)context->features->CO_NO_NMT_MASTER;
 
         if (errorStatusBitsP == NULL || errorRegisterP == NULL || preDefinedErrorFieldP == NULL || inhibitTimeEMCY == NULL)
         {
@@ -942,13 +974,13 @@ CO_ReturnError_t CO_CANopenInit(
         }
     }
 
-    txidxcan = (uint16_t)context->features.CO_NO_SDO_CLIENT + \
-                (uint16_t)context->features.CO_NO_SDO_SERVER + \
-                context->features.CO_NO_TPDO + \
-                (uint16_t)context->features.CO_NO_TIME + \
-                (uint16_t)context->features.CO_NO_EMERGENCY + \
-                (uint16_t)context->features.CO_NO_SYNC + \
-                (uint16_t)context->features.CO_NO_NMT_MASTER;
+    txidxcan = (uint16_t)context->features->CO_NO_SDO_CLIENT + \
+                (uint16_t)context->features->CO_NO_SDO_SERVER + \
+                context->features->CO_NO_TPDO + \
+                (uint16_t)context->features->CO_NO_TIME + \
+                (uint16_t)context->features->CO_NO_EMERGENCY + \
+                (uint16_t)context->features->CO_NO_SYNC + \
+                (uint16_t)context->features->CO_NO_NMT_MASTER;
 
     err = CO_NMT_init(
             CO->NMT,
@@ -967,7 +999,7 @@ CO_ReturnError_t CO_CANopenInit(
         return err;
     }
 
-    if (context->features.CO_NO_NMT_MASTER > 0)
+    if (context->features->CO_NO_NMT_MASTER > 0)
     {
         NMTM_txBuff = CO_CANtxBufferInit(/* return pointer to 8-byte CAN data buffer, which should be populated */
                 CO->CANmodule[0], /* pointer to CAN module used for sending this message */
@@ -978,24 +1010,24 @@ CO_ReturnError_t CO_CANopenInit(
                 0);               /* synchronous message flag bit */
     }
 
-    if (context->features.CO_NO_LSS_CLIENT > 0)
+    if (context->features->CO_NO_LSS_CLIENT > 0)
     {
-        rxidxcan = (uint16_t)context->features.CO_NO_HB_CONS +
-                    (uint16_t)context->features.CO_NO_SDO_CLIENT +
-                    (uint16_t)context->features.CO_NO_SDO_SERVER +
-                    context->features.CO_NO_RPDO +
-                    (uint16_t)context->features.CO_NO_TIME +
-                    (uint16_t)context->features.CO_NO_EMERGENCY +
-                    (uint16_t)context->features.CO_NO_SYNC + 1;
+        rxidxcan = (uint16_t)context->features->CO_NO_HB_CONS +
+                    (uint16_t)context->features->CO_NO_SDO_CLIENT +
+                    (uint16_t)context->features->CO_NO_SDO_SERVER +
+                    context->features->CO_NO_RPDO +
+                    (uint16_t)context->features->CO_NO_TIME +
+                    (uint16_t)context->features->CO_NO_EMERGENCY +
+                    (uint16_t)context->features->CO_NO_SYNC + 1;
 
-        txidxcan = (uint16_t)context->features.CO_NO_HB_PROD +
-                    (uint16_t)context->features.CO_NO_SDO_CLIENT +
-                    (uint16_t)context->features.CO_NO_SDO_SERVER +
-                    context->features.CO_NO_TPDO +
-                    (uint16_t)context->features.CO_NO_TIME +
-                    (uint16_t)context->features.CO_NO_EMERGENCY +
-                    (uint16_t)context->features.CO_NO_SYNC +
-                    (uint16_t)context->features.CO_NO_NMT_MASTER;
+        txidxcan = (uint16_t)context->features->CO_NO_HB_PROD +
+                    (uint16_t)context->features->CO_NO_SDO_CLIENT +
+                    (uint16_t)context->features->CO_NO_SDO_SERVER +
+                    context->features->CO_NO_TPDO +
+                    (uint16_t)context->features->CO_NO_TIME +
+                    (uint16_t)context->features->CO_NO_EMERGENCY +
+                    (uint16_t)context->features->CO_NO_SYNC +
+                    (uint16_t)context->features->CO_NO_NMT_MASTER;
 
         err = CO_LSSmaster_init(
             CO->LSSmaster,
@@ -1016,7 +1048,7 @@ CO_ReturnError_t CO_CANopenInit(
     /* This check is normally not really needed, but I use it as an optimization *
      * since a lot of stack based variables are encapsulated and freed immediately *
      * so on less powerful devices, stack usage is reduced (blankm 20191213) */
-    if (context->features.CO_NO_SYNC > 0)
+    if (context->features->CO_NO_SYNC > 0)
     {
         /*1005, Data Type: UNSIGNED32 */
         /* Poll over OD to find OD_COB_ID_SYNCMessage */
@@ -1037,7 +1069,7 @@ CO_ReturnError_t CO_CANopenInit(
             CO->CANmodule[0],
             CO_RXCAN_SYNC,
             CO->CANmodule[0],
-            (uint16_t)context->features.CO_TXCAN_SYNC);
+            (uint16_t)context->features->CO_TXCAN_SYNC);
 
         if (err)
         {
@@ -1160,7 +1192,7 @@ CO_ReturnError_t CO_CANopenInit(
         }
     }
 
-    for (i = 0; i < context->features.CO_NO_TPDO; i++)
+    for (i = 0; i < context->features->CO_NO_TPDO; i++)
     {
         /*1800[4], Data Type: OD_TPDOCommunicationParameter_t, Array[4] */
         /* Poll over OD to find OD_TPDOCommunicationParameter */
@@ -1257,14 +1289,14 @@ CO_ReturnError_t CO_CANopenInit(
         }
     }
 
-    if (context->features.CO_NO_HB_CONS > 0)
+    if (context->features->CO_NO_HB_CONS > 0)
     {
-        rxidxcan = (uint16_t)context->features.CO_NO_SDO_CLIENT +
-                   (uint16_t)context->features.CO_NO_SDO_SERVER +
-                   context->features.CO_NO_RPDO +
-                   (uint16_t)context->features.CO_NO_TIME +
-                   (uint16_t)context->features.CO_NO_EMERGENCY +
-                   (uint16_t)context->features.CO_NO_SYNC + 1;
+        rxidxcan = (uint16_t)context->features->CO_NO_SDO_CLIENT +
+                   (uint16_t)context->features->CO_NO_SDO_SERVER +
+                   context->features->CO_NO_RPDO +
+                   (uint16_t)context->features->CO_NO_TIME +
+                   (uint16_t)context->features->CO_NO_EMERGENCY +
+                   (uint16_t)context->features->CO_NO_SYNC + 1;
 
         /*1016, Data Type: UNSIGNED32, Array[4] */
         /* Poll over OD to find OD_consumerHeartbeatTime */
@@ -1286,7 +1318,7 @@ CO_ReturnError_t CO_CANopenInit(
         }
 
         /* Check for valid data */
-        if (consumerHeartbeatTimeLen != (uint16_t)context->features.CO_NO_HB_CONS)
+        if (consumerHeartbeatTimeLen != (uint16_t)context->features->CO_NO_HB_CONS)
         {
             /* Seems like there is a config mismatch */
             return CO_ERROR_DATA_CORRUPT;
@@ -1298,7 +1330,7 @@ CO_ReturnError_t CO_CANopenInit(
             CO->SDO[0],
             consumerHeartbeatTimeP,
             CO_HBcons_monitoredNodes,
-            context->features.CO_NO_HB_CONS,
+            context->features->CO_NO_HB_CONS,
             CO->CANmodule[0],
             rxidxcan);
 
@@ -1308,22 +1340,22 @@ CO_ReturnError_t CO_CANopenInit(
         }
     }
 
-    if(context->features.CO_NO_SDO_CLIENT > 0)
+    if(context->features->CO_NO_SDO_CLIENT > 0)
     {
-        rxidxcan = (uint16_t)context->features.CO_NO_SDO_SERVER +
-                    context->features.CO_NO_RPDO +
-                    (uint16_t)context->features.CO_NO_TIME +
-                    (uint16_t)context->features.CO_NO_EMERGENCY +
-                    (uint16_t)context->features.CO_NO_SYNC + 1;
+        rxidxcan = (uint16_t)context->features->CO_NO_SDO_SERVER +
+                    context->features->CO_NO_RPDO +
+                    (uint16_t)context->features->CO_NO_TIME +
+                    (uint16_t)context->features->CO_NO_EMERGENCY +
+                    (uint16_t)context->features->CO_NO_SYNC + 1;
 
-        txidxcan = (uint16_t)context->features.CO_NO_SDO_SERVER +
-                    context->features.CO_NO_TPDO +
-                    (uint16_t)context->features.CO_NO_TIME +
-                    (uint16_t)context->features.CO_NO_EMERGENCY +
-                    (uint16_t)context->features.CO_NO_SYNC +
-                    (uint16_t)context->features.CO_NO_NMT_MASTER;
+        txidxcan = (uint16_t)context->features->CO_NO_SDO_SERVER +
+                    context->features->CO_NO_TPDO +
+                    (uint16_t)context->features->CO_NO_TIME +
+                    (uint16_t)context->features->CO_NO_EMERGENCY +
+                    (uint16_t)context->features->CO_NO_SYNC +
+                    (uint16_t)context->features->CO_NO_NMT_MASTER;
 
-        for (i = 0; i < (uint16_t)context->features.CO_NO_SDO_CLIENT; i++)
+        for (i = 0; i < (uint16_t)context->features->CO_NO_SDO_CLIENT; i++)
         {
             /*1280[4], Data Type: OD_SDOClientParameter_t, Array[4] */
             /* Poll over OD to find OD_SDOClientParameter */
@@ -1385,11 +1417,11 @@ CO_ReturnError_t CO_CANopenInit(
         }
     }
 
-    if(context->features.CO_NO_TRACE > 0)
+    if(context->features->CO_NO_TRACE > 0)
     {
         // FIXME blankm 20191213: I don't know what OD entry 2400 traceEnable is for, it is not used throughout the stack?
               
-        for (i = 0; i < (uint16_t)context->features.CO_NO_TRACE; i++)
+        for (i = 0; i < (uint16_t)context->features->CO_NO_TRACE; i++)
         {
             /*2301[2], Data Type: OD_traceConfig_t, Array[2] */
             /* Poll over OD to find OD_traceConfig */
@@ -1522,7 +1554,7 @@ void CO_delete(
     CO_CANmodule_disable(CO->CANmodule[0]);
 
     // Cleaning the trace stuff is easy since all is allocated at once and thus can be freed at once
-    if(context->features.CO_NO_TRACE > 0)
+    if(context->features->CO_NO_TRACE > 0)
     {
         COfree(CO->trace[0].timeBuffer);
         COfree(CO->trace[0].valueBuffer);
@@ -1534,21 +1566,21 @@ void CO_delete(
         COfree(CO->SDOclient[i]);
     }
 
-    if (context->features.CO_NO_LSS_SERVER > 0)
+    if (context->features->CO_NO_LSS_SERVER > 0)
     {
         COfree(CO->LSSslave);
     }
-    if (context->features.CO_NO_LSS_CLIENT > 0)
+    if (context->features->CO_NO_LSS_CLIENT > 0)
     {
         COfree(CO->LSSmaster);
     }
     COfree(CO_HBcons_monitoredNodes);
     COfree(CO->HBcons);
-    for (i = 0; i < context->features.CO_NO_RPDO; i++)
+    for (i = 0; i < context->features->CO_NO_RPDO; i++)
     {
         COfree(CO->RPDO[i]);
     }
-    for (i = 0; i < context->features.CO_NO_TPDO; i++)
+    for (i = 0; i < context->features->CO_NO_TPDO; i++)
     {
         COfree(CO->TPDO[i]);
     }
@@ -1562,7 +1594,7 @@ void CO_delete(
     COfree(CO->emPr);
     COfree(CO->em);
     COfree(CO_SDO_ODExtensions);
-    for (i = 0; i < (uint16_t)context->features.CO_NO_SDO_SERVER; i++)
+    for (i = 0; i < (uint16_t)context->features->CO_NO_SDO_SERVER; i++)
     {
         COfree(CO->SDO[i]);
     }
@@ -1692,7 +1724,7 @@ void CO_process_TPDO(
     uint16_t i;
 
     /* Verify PDO Change Of State and process PDOs */
-    for (i = 0; i < context->features.CO_NO_TPDO; i++)
+    for (i = 0; i < context->features->CO_NO_TPDO; i++)
     {
         if (!CO_this->TPDO[i]->sendRequest)
             CO_this->TPDO[i]->sendRequest = CO_TPDOisCOS(CO_this->TPDO[i]);
