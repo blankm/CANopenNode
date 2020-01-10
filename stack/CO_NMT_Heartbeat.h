@@ -258,7 +258,7 @@ CO_NMT_reset_cmd_t CO_NMT_process(
         uint16_t                HBtime,
         uint32_t                NMTstartup,
         uint8_t                 errorRegister,
-        const uint8_t           errorBehavior[],
+        const uint8_t          *errorBehavior,
         uint16_t               *timerNext_ms);
 
 
