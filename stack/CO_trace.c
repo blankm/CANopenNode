@@ -180,9 +180,9 @@ static CO_SDO_abortCode_t CO_ODF_traceConfig(CO_ODF_arg_t *ODF_arg) {
 
     switch(ODF_arg->subIndex) {
     case 1:     /* size */
-        if(ODF_arg->reading) {
-            uint32_t *value = (uint32_t*) ODF_arg->data;
-            *value = trace->bufferSize;
+        if(ODF_arg->reading) {            
+
+            CO_setUint32(ODF_arg->data, trace->bufferSize);
         }
         break;
 
@@ -233,7 +233,11 @@ static CO_SDO_abortCode_t CO_ODF_traceConfig(CO_ODF_arg_t *ODF_arg) {
             }
         }
         break;
+    default:
+        ret = CO_SDO_AB_UNSUPPORTED_ACCESS;
+        break;
     }
+    
 
     return ret;
 }
@@ -250,22 +254,23 @@ static CO_SDO_abortCode_t CO_ODF_trace(CO_ODF_arg_t *ODF_arg) {
     switch(ODF_arg->subIndex) {
     case 1:     /* size */
         if(ODF_arg->reading) {
-            uint32_t *value = (uint32_t*) ODF_arg->data;
+            uint32_t value = CO_getUint32(ODF_arg->data);
             uint32_t size = trace->bufferSize;
             uint32_t wp = trace->writePtr;
             uint32_t rp = trace->readPtr;
 
             if(wp >= rp) {
-                *value = wp - rp;
+                value = wp - rp;
             }
             else {
-                *value = size - rp + wp;
+                value = size - rp + wp;
             }
+            CO_setUint32(ODF_arg->data, value);
         }
         else {
-            uint32_t *value = (uint32_t*) ODF_arg->data;
+            uint32_t value = CO_getUint32(ODF_arg->data);
 
-            if(*value == 0) {
+            if(value == 0) {
                 /* clear buffer, handle race conditions */
                 while(trace->readPtr != 0 || trace->writePtr != 0) {
                     trace->readPtr = 0;
@@ -386,6 +391,9 @@ static CO_SDO_abortCode_t CO_ODF_trace(CO_ODF_arg_t *ODF_arg) {
                 ODF_arg->dataLength -= freeLen;
             }
         }
+        break;
+    default:
+        ret = CO_SDO_AB_UNSUPPORTED_ACCESS;
         break;
     }
 

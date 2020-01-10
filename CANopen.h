@@ -247,7 +247,7 @@ CO_ReturnError_t CO_init(
  * @param context CO_Context to use.
  */
 void CO_delete(
-        void *CANdriverState
+        void *CANdriverState,
         CO_Context_t           *context);
 
 
@@ -258,6 +258,7 @@ void CO_delete(
  * objects.
  *
  * @param CO_this This object
+ * @param context CO_Context to use.
  * @param timeDifference_ms Time difference from previous function call in [milliseconds].
  * @param timerNext_ms Return value - info to OS - maximum delay after function
  *        should be called next time in [milliseconds]. Value can be used for OS
@@ -270,6 +271,7 @@ void CO_delete(
  */
 CO_NMT_reset_cmd_t CO_process(
         CO_t                   *CO_this,
+        CO_Context_t           *context,
         uint16_t                timeDifference_ms,
         uint16_t               *timerNext_ms);
 

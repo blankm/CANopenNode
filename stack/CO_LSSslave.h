@@ -32,8 +32,6 @@
 extern "C" {
 #endif
 
-#if CO_NO_LSS_SERVER == 1
-
 #include "CO_LSS.h"
 
 /**
@@ -410,17 +408,6 @@ void CO_LSSslave_initCfgStoreCallback(
         void                   *object,
         bool_t                (*pFunctLSScfgStore)(void *object, uint8_t id, uint16_t bitRate));
 
-#else /* CO_NO_LSS_SERVER == 1 */
-
-/**
- * @addtogroup CO_LSS
- * @{
- * If you need documetation for LSS slave usage, add "CO_NO_LSS_SERVER=1" to doxygen
- * "PREDEFINED" variable.
- *
- */
-
-#endif /* CO_NO_LSS_SERVER == 1 */
 
 #ifdef __cplusplus
 }

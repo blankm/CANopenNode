@@ -27,8 +27,6 @@
 #include "CANopen.h"
 #include "CO_LSSmaster.h"
 
-#if CO_NO_LSS_CLIENT == 1
-
 /*
  * LSS master slave select state machine. Compared to #CO_LSS_state_t this
  * has information if we currently have selected one or all slaves. This
@@ -1102,6 +1100,3 @@ CO_LSSmaster_return_t CO_LSSmaster_IdentifyFastscan(
     }
     return ret;
 }
-
-
-#endif

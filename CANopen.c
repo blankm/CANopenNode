@@ -44,15 +44,13 @@ static uint32_t CO_memoryUsed = 0; /* informative */
 
 /* Global variables ***********************************************************/
 
-static CO_Context_t *CO_Context; /* Pointer to context struct */
-
 static CO_t COO;
 CO_t *CO = NULL;
 
-static CO_CANrx_t *CO_CANmodule_rxArray0;
-static CO_CANtx_t *CO_CANmodule_txArray0;
-static CO_OD_extension_t *CO_SDO_ODExtensions;
-static CO_HBconsNode_t *CO_HBcons_monitoredNodes;
+CO_CANrx_t *CO_CANmodule_rxArray0;
+CO_CANtx_t *CO_CANmodule_txArray0;
+CO_OD_extension_t *CO_SDO_ODExtensions;
+CO_HBconsNode_t *CO_HBcons_monitoredNodes;
 
 #ifndef CO_TRACE_BUFFER_SIZE_FIXED
 #define CO_TRACE_BUFFER_SIZE_FIXED 100
@@ -80,6 +78,11 @@ static CO_HBconsNode_t *CO_HBcons_monitoredNodes;
         #error Features from CO_OD.h file are not corectly configured for this project!
     #endif
 
+/* The following idexes are never calculated, but are fixed */
+#define CO_RXCAN_NMT       0                /*  index for NMT message */
+#define CO_RXCAN_SYNC      1                /*  index for SYNC message */
+#define CO_TXCAN_NMT       0                /*  index for NMT master message */
+
 static inline uint16_t CO_RXCAN_NO_MSGS(CO_Context_t * context)
 {
     //(1+CO_NO_SYNC+CO_NO_EMERGENCY+CO_NO_TIME+CO_NO_RPDO+CO_NO_SDO_SERVER+CO_NO_SDO_CLIENT+CO_NO_HB_CONS)
@@ -98,16 +101,16 @@ static inline uint16_t CO_TXCAN_NO_MSGS(CO_Context_t * context)
 {
     //(CO_NO_NMT_MASTER+CO_NO_SYNC+CO_NO_EMERGENCY+CO_NO_TIME+CO_NO_TPDO+CO_NO_SDO_SERVER+CO_NO_SDO_CLIENT+CO_NO_HB_PROD+CO_NO_LSS_SERVER+CO_NO_LSS_CLIENT)
     uint16_t txcnt = 0;
-    rxcnt += context->features->CO_NO_NMT_MASTER;
-    rxcnt += context->features->CO_NO_SYNC;
-    rxcnt += context->features->CO_NO_EMERGENCY;
-    rxcnt += context->features->CO_NO_TIME;
-    rxcnt += context->features->CO_NO_TPDO;
-    rxcnt += context->features->CO_NO_SDO_SERVER;
-    rxcnt += context->features->CO_NO_SDO_CLIENT;
-    rxcnt += context->features->CO_NO_HB_PROD;
-    rxcnt += context->features->CO_NO_LSS_SERVER;
-    rxcnt += context->features->CO_NO_LSS_CLIENT;
+    txcnt += context->features->CO_NO_NMT_MASTER;
+    txcnt += context->features->CO_NO_SYNC;
+    txcnt += context->features->CO_NO_EMERGENCY;
+    txcnt += context->features->CO_NO_TIME;
+    txcnt += context->features->CO_NO_TPDO;
+    txcnt += context->features->CO_NO_SDO_SERVER;
+    txcnt += context->features->CO_NO_SDO_CLIENT;
+    txcnt += context->features->CO_NO_HB_PROD;
+    txcnt += context->features->CO_NO_LSS_SERVER;
+    txcnt += context->features->CO_NO_LSS_CLIENT;
     return txcnt;
 }
 
@@ -585,8 +588,7 @@ CO_ReturnError_t CO_new(CO_Context_t *context)
                     }
                 }
             }
-        } 
-    }
+        }
 
     CO_memoryUsed = sizeof(CO_CANmodule_t)
                   + sizeof(CO_CANrx_t) * CO_RXCAN_NO_MSGS
@@ -610,16 +612,6 @@ CO_ReturnError_t CO_new(CO_Context_t *context)
     {
         CO_memoryUsed += sizeof(CO_LSSslave_t);
     }
-  
-    if(context->features->CO_NO_LSS_CLIENT == 1)
-    {
-        CO_memoryUsed += sizeof(CO_LSSmaster_t);
-    }
-    CO_memoryUsed += sizeof(CO_SDOclient_t) * (uint32_t)context->features->CO_NO_SDO_CLIENT;
-    
-    CO_memoryUsed += sizeof(CO_trace_t) * (uint32_t)context->features->CO_NO_TRACE;
-    CO_memoryUsed += (sizeof(int32_t) + sizeof(uint32_t)) * neededBuffersize;
-    
 
     errCnt = 0;
     if(CO->CANmodule[0]                 == NULL) errCnt++;
@@ -702,7 +694,7 @@ CO_ReturnError_t CO_LSSinit(
                             context->features->CO_NO_RPDO + \
                             (uint16_t)context->features->CO_NO_TIME + \
                             (uint16_t)context->features->CO_NO_EMERGENCY + \
-                            (uint16_t)context->features->CO_NO_SYNC + 1;
+                            (uint16_t)context->features->CO_NO_SYNC + CO_RXCAN_SYNC;
 
     uint16_t txidxcan_LSS = (uint16_t)context->features->CO_NO_HB_PROD + \
                             (uint16_t)context->features->CO_NO_SDO_CLIENT + \
@@ -755,10 +747,6 @@ CO_ReturnError_t CO_LSSinit(
     }
 
 
-    lssAddress.identity.productCode = OD_identity.productCode;
-    lssAddress.identity.revisionNumber = OD_identity.revisionNumber;
-    lssAddress.identity.serialNumber = OD_identity.serialNumber;
-    lssAddress.identity.vendorID = OD_identity.vendorID;
     err = CO_LSSslave_init(
             CO->LSSslave,
             lssAddress,
@@ -796,7 +784,7 @@ CO_ReturnError_t CO_CANopenInit(
     rxidxcan = context->features->CO_NO_RPDO + \
                 (uint16_t)context->features->CO_NO_TIME + \
                 (uint16_t)context->features->CO_NO_EMERGENCY + \
-                (uint16_t)context->features->CO_NO_SYNC + 1;
+                (uint16_t)context->features->CO_NO_SYNC + CO_RXCAN_SYNC;
 
     txidxcan = context->features->CO_NO_TPDO + \
                 (uint16_t)context->features->CO_NO_TIME + \
@@ -848,11 +836,11 @@ CO_ReturnError_t CO_CANopenInit(
             {
                 if(recP[subS2C].length == 4 && recP[subS2C].pData != NULL)
                 {
-                    COB_IDServerToClient = *((uint32_t *)recP[subS2C].pData; // Subindex subS2C holds COB_IDServerToClient as uint32_t
+                    COB_IDServerToClient = *((uint32_t *)recP[subS2C].pData); // Subindex subS2C holds COB_IDServerToClient as uint32_t
                 }
                 if(recP[subC2S].length == 4 && recP[subC2S].pData != NULL)
                 {
-                    COB_IDClientToServer = *((uint32_t *)recP[subC2S].pData; // Subindex subC2S holds COB_IDClientToServer as uint32_t
+                    COB_IDClientToServer = *((uint32_t *)recP[subC2S].pData); // Subindex subC2S holds COB_IDClientToServer as uint32_t
                 }
             }
         }
@@ -862,13 +850,13 @@ CO_ReturnError_t CO_CANopenInit(
         if(COB_IDClientToServer != 0 && COB_IDServerToClient != 0)
         {
             err = CO_SDO_init(
-                CO->SDO[i],
+                &CO->SDO[i],
                 COB_IDClientToServer,
                 COB_IDServerToClient,
                 OD_H1200_SDO_SERVER_PARAM + i,
-                i == 0 ? 0 : CO->SDO[0],
+                i == 0 ? NULL : &CO->SDO[0],
                 context->usedOD,
-                context->CO_OD_NoOfElements,
+                context->numberOfODElements,
                 CO_SDO_ODExtensions,
                 nodeId,
                 CO->CANmodule[0],
@@ -937,14 +925,14 @@ CO_ReturnError_t CO_CANopenInit(
             }
 
             /* Check if all found */
-            if (errorRegisterP != NULL && errorStatusBitsP != NULL && preDefinedErrorFieldP != NULL || inhibitTimeEMCY != NULL)
+            if (errorRegisterP != NULL && errorStatusBitsP != NULL && preDefinedErrorFieldP != NULL && inhibitTimeEMCY != NULL)
             {
                 /* Exit early, we're done here */
                 break;
             }
         }
 
-        rxidxcan = (uint16_t)context->features->CO_NO_SYNC + 1;
+        rxidxcan = (uint16_t)context->features->CO_NO_SYNC + CO_RXCAN_SYNC;
         txidxcan = (uint16_t)context->features->CO_NO_SYNC +
                    (uint16_t)context->features->CO_NO_NMT_MASTER;
 
@@ -956,7 +944,7 @@ CO_ReturnError_t CO_CANopenInit(
         err = CO_EM_init(
             CO->em,
             CO->emPr,
-            CO->SDO[0],
+           &CO->SDO[0],
             errorStatusBitsP,
             errorStatusBitsLen,
             errorRegisterP,
@@ -982,13 +970,15 @@ CO_ReturnError_t CO_CANopenInit(
                 (uint16_t)context->features->CO_NO_SYNC + \
                 (uint16_t)context->features->CO_NO_NMT_MASTER;
 
+    rxidxcan = CO_RXCAN_NMT; 
+
     err = CO_NMT_init(
             CO->NMT,
             CO->emPr,
             nodeId,
             500,
             CO->CANmodule[0],
-            CO_RXCAN_NMT,
+            rxidxcan,
             CO_CAN_ID_NMT_SERVICE,
             CO->CANmodule[0],
             txidxcan,
@@ -1018,7 +1008,7 @@ CO_ReturnError_t CO_CANopenInit(
                     context->features->CO_NO_RPDO +
                     (uint16_t)context->features->CO_NO_TIME +
                     (uint16_t)context->features->CO_NO_EMERGENCY +
-                    (uint16_t)context->features->CO_NO_SYNC + 1;
+                    (uint16_t)context->features->CO_NO_SYNC + CO_RXCAN_SYNC;
 
         txidxcan = (uint16_t)context->features->CO_NO_HB_PROD +
                     (uint16_t)context->features->CO_NO_SDO_CLIENT +
@@ -1061,15 +1051,15 @@ CO_ReturnError_t CO_CANopenInit(
     err = CO_SYNC_init(
             CO->SYNC,
             CO->em,
-            CO->SDO[0],
-            &CO->NMT->operatingState,
-            *COB_ID_SYNCMessageP,
-            *communicationCyclePeriodP,
-            *synchronousCounterOverflowValueP,
+           &CO->SDO[0],
+           &CO->NMT->operatingState,
+           *COB_ID_SYNCMessageP,
+           *communicationCyclePeriodP,
+           *synchronousCounterOverflowValueP,
             CO->CANmodule[0],
-            CO_RXCAN_SYNC,
+            rxidxcan,
             CO->CANmodule[0],
-            (uint16_t)context->features->CO_TXCAN_SYNC);
+            txidxcan);
 
         if (err)
         {
@@ -1082,7 +1072,7 @@ CO_ReturnError_t CO_CANopenInit(
     err = CO_TIME_init(
             CO->TIME,
             CO->em,
-            CO->SDO[0],
+            &CO->SDO[0],
             &CO->NMT->operatingState,
             *COB_ID_TIMEP,
             0,
@@ -1170,17 +1160,20 @@ CO_ReturnError_t CO_CANopenInit(
         /* We do not really have pointers to the struct, only pointers to the elements of the struct */
         /* So we hope that pointing to the first element points correctly to the struct */
         // FIXME: Try to find a better way to get the struct pointer.
+
+        // FIXME: Comm parameter editability should be part of config!
+
         err = CO_RPDO_init(
-                CO->RPDO[i],
+               &CO->RPDO[i],
                 CO->em,
-                CO->SDO[0],
+               &CO->SDO[0],
                 CO->SYNC,
                &CO->NMT->operatingState,
                 nodeId,
                 ((i<4) ? (CO_CAN_ID_RPDO_1+i*0x100) : 0),
                 0,
-                (CO_RPDOCommPar_t*) recP[0]->pData,
-                (CO_RPDOMapPar_t*) recP2[0]->pData,
+                (CO_RPDOCommPar_t*) recP[0].pData,
+                (CO_RPDOMapPar_t*) recP2[0].pData,
                 OD_H1400_RXPDO_1_PARAM+i,
                 OD_H1600_RXPDO_1_MAPPING+i,
                 CANdevRx,
@@ -1267,6 +1260,8 @@ CO_ReturnError_t CO_CANopenInit(
         /* So we hope that pointing to the first element points correctly to the struct */
         // FIXME: Try to find a better way to get the struct pointer.
 
+        // FIXME: Comm parameter editability should be part of config!
+
         err = CO_TPDO_init(
                 CO->TPDO[i],
                 CO->em,
@@ -1296,7 +1291,7 @@ CO_ReturnError_t CO_CANopenInit(
                    context->features->CO_NO_RPDO +
                    (uint16_t)context->features->CO_NO_TIME +
                    (uint16_t)context->features->CO_NO_EMERGENCY +
-                   (uint16_t)context->features->CO_NO_SYNC + 1;
+                   (uint16_t)context->features->CO_NO_SYNC + CO_RXCAN_SYNC;
 
         /*1016, Data Type: UNSIGNED32, Array[4] */
         /* Poll over OD to find OD_consumerHeartbeatTime */
@@ -1327,7 +1322,7 @@ CO_ReturnError_t CO_CANopenInit(
         err = CO_HBconsumer_init(
             CO->HBcons,
             CO->em,
-            CO->SDO[0],
+           &CO->SDO[0],
             consumerHeartbeatTimeP,
             CO_HBcons_monitoredNodes,
             context->features->CO_NO_HB_CONS,
@@ -1346,7 +1341,7 @@ CO_ReturnError_t CO_CANopenInit(
                     context->features->CO_NO_RPDO +
                     (uint16_t)context->features->CO_NO_TIME +
                     (uint16_t)context->features->CO_NO_EMERGENCY +
-                    (uint16_t)context->features->CO_NO_SYNC + 1;
+                    (uint16_t)context->features->CO_NO_SYNC + CO_RXCAN_SYNC;
 
         txidxcan = (uint16_t)context->features->CO_NO_SDO_SERVER +
                     context->features->CO_NO_TPDO +
@@ -1402,8 +1397,8 @@ CO_ReturnError_t CO_CANopenInit(
             // FIXME: Try to find a better way to get the struct pointer.
 
             err = CO_SDOclient_init(
-                CO->SDOclient[i],
-                CO->SDO[0],
+               &CO->SDOclient[i],
+               &CO->SDO[0],
                 (CO_SDOclientPar_t *)recP[0].pData,
                 CO->CANmodule[0],
                 rxidxcan + i,
@@ -1491,8 +1486,8 @@ CO_ReturnError_t CO_CANopenInit(
             }
             
             CO_trace_init(
-                CO->trace[i], //ok
-                CO->SDO[0], //ok
+               &CO->trace[i], //ok
+               &CO->SDO[0], //ok
                 *((uint8_t *)recP[2].pData),
                 CO->trace[i].timeBuffer, //ok
                 CO->trace[i].valueBuffer, //ok
@@ -1500,11 +1495,11 @@ CO_ReturnError_t CO_CANopenInit(
                 ((uint32_t *)recP[5].pData), /* traceConfig[i].map       == idx 2301ff, subindex 5, uint32 */
                 ((uint8_t *)recP[6].pData),  /* traceConfig[i].format    == idx 2301ff, subindex 6, uint8  */
                 ((uint8_t *)recP[7].pData),  /* traceConfig[i].trigger   == idx 2301ff, subindex 7, uint8  */
-                ((uint32_t *)recP[8].pData), /* traceConfig[i].threshold == idx 2301ff, subindex 8, int32  */
-                ((int32_t *)rec[2].pData),   /* trace[i].value           == idx 2401ff, subindex 2, int32  */
-                ((int32_t *)rec[3].pData),   /* trace[i].min             == idx 2401ff, subindex 3, int32  */
-                ((int32_t *)rec[4].pData),   /* trace[i].max             == idx 2401ff, subindex 4, int32  */
-                ((uint32_t *)rec[6].pData),  /* trace[i].triggerTime     == idx 2401ff, subindex 6, uint32 */
+                ((int32_t *)recP[8].pData), /* traceConfig[i].threshold == idx 2301ff, subindex 8, int32  */
+                ((int32_t *)recP2[2].pData),   /* trace[i].value           == idx 2401ff, subindex 2, int32  */
+                ((int32_t *)recP2[3].pData),   /* trace[i].min             == idx 2401ff, subindex 3, int32  */
+                ((int32_t *)recP2[4].pData),   /* trace[i].max             == idx 2401ff, subindex 4, int32  */
+                ((uint32_t *)recP2[6].pData),  /* trace[i].triggerTime     == idx 2401ff, subindex 6, uint32 */
                 OD_INDEX_TRACE_CONFIG + i, /* This is a define in CO_trace.h which doesn't need altering, it is 0x2301 */
                 OD_INDEX_TRACE + i);       /* This is a define in CO_trace.h which doesn't need altering, it is 0x2401 */
         }
@@ -1525,18 +1520,19 @@ CO_ReturnError_t CO_init(
 
     err = CO_new(context);
     if (err) {
+        CO_delete(CANdriverState, context);
         return err;
     }
 
     err = CO_CANinit(CANdriverState, bitRate, context);
     if (err) {
-        CO_delete(CANdriverState);
+        CO_delete(CANdriverState, context);
         return err;
     }
 
     err = CO_CANopenInit(nodeId, context);
     if (err) {
-        CO_delete(CANdriverState);
+        CO_delete(CANdriverState, context);
         return err;
     }
 
@@ -1548,8 +1544,6 @@ void CO_delete(
         void                   *CANdriverState, 
         CO_Context_t           *context)
 {
-    uint16_t i;
-
     CO_CANsetConfigurationMode(CANdriverState);
     CO_CANmodule_disable(CO->CANmodule[0]);
 
@@ -1561,10 +1555,8 @@ void CO_delete(
         COfree(CO->trace);
     }
 
-    for (i = 0; i < (uint16_t)context_features.CO_NO_SDO_CLIENT; i++)
-    {
-        COfree(CO->SDOclient[i]);
-    }
+    // Cleaning SDOClients is easy since all is allocated at once and thus can be freed at once
+    COfree(CO->SDOclient);    
 
     if (context->features->CO_NO_LSS_SERVER > 0)
     {
@@ -1574,16 +1566,14 @@ void CO_delete(
     {
         COfree(CO->LSSmaster);
     }
+    // Cleaning CO_HBcons_monitoredNodes is easy since all is allocated at once and thus can be freed at once
     COfree(CO_HBcons_monitoredNodes);
     COfree(CO->HBcons);
-    for (i = 0; i < context->features->CO_NO_RPDO; i++)
-    {
-        COfree(CO->RPDO[i]);
-    }
-    for (i = 0; i < context->features->CO_NO_TPDO; i++)
-    {
-        COfree(CO->TPDO[i]);
-    }
+    // Cleaning RPDO is easy since all is allocated at once and thus can be freed at once
+    COfree(CO->RPDO);
+    // Cleaning TPDO is easy since all is allocated at once and thus can be freed at once
+    COfree(CO->TPDO);
+    
   #if CO_NO_SYNC == 1
     COfree(CO->SYNC);
   #endif
@@ -1593,11 +1583,11 @@ void CO_delete(
     COfree(CO->NMT);
     COfree(CO->emPr);
     COfree(CO->em);
+    // Cleaning SDO and extensions is easy since all is allocated at once and thus can be freed at once
     COfree(CO_SDO_ODExtensions);
-    for (i = 0; i < (uint16_t)context->features->CO_NO_SDO_SERVER; i++)
-    {
-        COfree(CO->SDO[i]);
-    }
+    COfree(CO->SDO);
+    
+    // Cleaning the arrays is easy since all is allocated at once and thus can be freed at once
     COfree(CO_CANmodule_txArray0);
     COfree(CO_CANmodule_rxArray0);
     COfree(CO->CANmodule[0]);
@@ -1607,6 +1597,7 @@ void CO_delete(
 /******************************************************************************/
 CO_NMT_reset_cmd_t CO_process(
         CO_t                   *CO_this,
+        CO_Context_t           *context,
         uint16_t                timeDifference_ms,
         uint16_t               *timerNext_ms)
 {
@@ -1634,9 +1625,9 @@ CO_NMT_reset_cmd_t CO_process(
     }
 
 
-    for(i=0; i<CO_NO_SDO_SERVER; i++){
+    for(i=0; i<context->features->CO_NO_SDO_SERVER; i++){
         CO_SDO_process(
-                CO_this->SDO[i],
+               &CO_this->SDO[i],
                 NMTisPreOrOperational,
                 timeDifference_ms,
                 1000,
@@ -1657,7 +1648,7 @@ CO_NMT_reset_cmd_t CO_process(
            *producerHeartbeatTime,
            *NMTStartup,
            *errorRegister,
-           *errorBehavior,
+            errorBehavior,
             timerNext_ms);
 
 
@@ -1709,7 +1700,7 @@ void CO_process_RPDO(
     uint16_t i;
 
     for(i=0; i<CO_NO_RPDO; i++){
-        CO_RPDO_process(CO_this->RPDO[i], syncWas);
+        CO_RPDO_process(&CO_this->RPDO[i], syncWas);
     }
 }
 
@@ -1726,8 +1717,8 @@ void CO_process_TPDO(
     /* Verify PDO Change Of State and process PDOs */
     for (i = 0; i < context->features->CO_NO_TPDO; i++)
     {
-        if (!CO_this->TPDO[i]->sendRequest)
-            CO_this->TPDO[i]->sendRequest = CO_TPDOisCOS(CO_this->TPDO[i]);
-        CO_TPDO_process(CO_this->TPDO[i], CO_this->SYNC, syncWas, timeDifference_us);
+        if (!CO_this->TPDO[i].sendRequest)
+            CO_this->TPDO[i].sendRequest = CO_TPDOisCOS(&CO_this->TPDO[i]);
+        CO_TPDO_process(&CO_this->TPDO[i], CO_this->SYNC, syncWas, timeDifference_us);
     }
 }

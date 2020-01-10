@@ -27,8 +27,6 @@
 #include "CANopen.h"
 #include "CO_LSSslave.h"
 
-#if CO_NO_LSS_SERVER == 1
-
 /*
  * Helper function - Handle service "switch state global"
  */
@@ -89,6 +87,20 @@ static void CO_LSSslave_serviceSwitchStateSelective(
                 CO_CANsend(LSSslave->CANdevTx, LSSslave->TXbuff);
             }
             break;
+        /* Unused and default case */
+        case CO_LSS_SWITCH_STATE_GLOBAL:
+        case CO_LSS_SWITCH_STATE_SEL:
+        case CO_LSS_CFG_NODE_ID:
+        case CO_LSS_CFG_BIT_TIMING:
+        case CO_LSS_CFG_ACTIVATE_BIT_TIMING:
+        case CO_LSS_CFG_STORE:
+        case CO_LSS_IDENT_SLAVE:
+        case CO_LSS_IDENT_FASTSCAN:
+        case CO_LSS_INQUIRE_VENDOR:
+        case CO_LSS_INQUIRE_PRODUCT:
+        case CO_LSS_INQUIRE_REV:
+        case CO_LSS_INQUIRE_SERIAL:
+        case CO_LSS_INQUIRE_NODE_ID:
         default:
             break;
     }
@@ -205,6 +217,21 @@ static void CO_LSSslave_serviceConfig(
             CO_memset(&LSSslave->TXbuff->data[2], 0, 6);
             CO_CANsend(LSSslave->CANdevTx, LSSslave->TXbuff);
             break;
+
+        /* Unused and default case */
+        case CO_LSS_SWITCH_STATE_GLOBAL:
+        case CO_LSS_SWITCH_STATE_SEL_VENDOR:
+        case CO_LSS_SWITCH_STATE_SEL_PRODUCT:
+        case CO_LSS_SWITCH_STATE_SEL_REV:
+        case CO_LSS_SWITCH_STATE_SEL_SERIAL:
+        case CO_LSS_SWITCH_STATE_SEL:
+        case CO_LSS_IDENT_SLAVE:
+        case CO_LSS_IDENT_FASTSCAN:
+        case CO_LSS_INQUIRE_VENDOR:
+        case CO_LSS_INQUIRE_PRODUCT:
+        case CO_LSS_INQUIRE_REV:
+        case CO_LSS_INQUIRE_SERIAL:
+        case CO_LSS_INQUIRE_NODE_ID:
         default:
             break;
     }
@@ -240,6 +267,20 @@ static void CO_LSSslave_serviceInquire(
         case CO_LSS_INQUIRE_NODE_ID:
             value = (uint32_t)LSSslave->activeNodeID;
             break;
+
+        /* Unused and default case */
+        case CO_LSS_SWITCH_STATE_GLOBAL:
+        case CO_LSS_SWITCH_STATE_SEL_VENDOR:
+        case CO_LSS_SWITCH_STATE_SEL_PRODUCT:
+        case CO_LSS_SWITCH_STATE_SEL_REV:
+        case CO_LSS_SWITCH_STATE_SEL_SERIAL:
+        case CO_LSS_SWITCH_STATE_SEL:
+        case CO_LSS_CFG_NODE_ID:
+        case CO_LSS_CFG_BIT_TIMING:
+        case CO_LSS_CFG_ACTIVATE_BIT_TIMING:
+        case CO_LSS_CFG_STORE:
+        case CO_LSS_IDENT_SLAVE:
+        case CO_LSS_IDENT_FASTSCAN:
         default:
             return;
     }
@@ -510,6 +551,7 @@ bool_t CO_LSSslave_LEDprocess(
             case    4:  flash2 = -104; break;
             case -100:  flash2 =  100; break;
             case  104:  flash2 =  -50; break;
+            default: break;
         }
     }
     if (LSSslave->lssState == CO_LSS_STATE_CONFIGURATION)
@@ -524,6 +566,3 @@ bool_t CO_LSSslave_LEDprocess(
     }
     return false;
 }
-
-
-#endif
