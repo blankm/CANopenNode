@@ -51,6 +51,7 @@
 extern "C" {
 #endif
 
+#if CO_NO_LSS_CLIENT == 1
 
 #include "CO_LSS.h"
 
@@ -482,6 +483,17 @@ CO_LSSmaster_return_t CO_LSSmaster_IdentifyFastscan(
         CO_LSSmaster_fastscan_t         *fastscan);
 
 
+#else /* CO_NO_LSS_CLIENT == 1 */
+
+/**
+ * @addtogroup CO_LSS
+ * @{
+ * If you need documetation for LSS master usage, add "CO_NO_LSS_CLIENT=1" to doxygen
+ * "PREDEFINED" variable.
+ *
+ */
+
+#endif /* CO_NO_LSS_CLIENT == 1 */
 
 #ifdef __cplusplus
 }

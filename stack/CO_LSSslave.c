@@ -46,6 +46,8 @@
 #include "CANopen.h"
 #include "CO_LSSslave.h"
 
+#if CO_NO_LSS_SERVER == 1
+
 /*
  * Helper function - Handle service "switch state global"
  */
@@ -585,3 +587,5 @@ bool_t CO_LSSslave_LEDprocess(
     }
     return false;
 }
+
+#endif
