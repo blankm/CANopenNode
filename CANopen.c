@@ -248,70 +248,26 @@ CO_ReturnError_t CO_verifyFeatures(CO_Context_t * context)
     static CO_LSSslave_t        CO0_LSSslave;
 #endif
 
-/**
- * Allocate and initialize memory for CANopen object
- *
- * Function must be called in the communication reset section.
- *
- * @return #CO_ReturnError_t: CO_ERROR_NO, CO_ERROR_ILLEGAL_ARGUMENT,
- * CO_ERROR_OUT_OF_MEMORY
- */
+/* These declarations here are needed in the case the switches for the project 
+    change the visibility in the headers in a way that the compiler doesn't see an declaration anymore */
+
+#if CO_NO_LSS_SERVER == 0 /* LSS Server means LSS slave */
+
 CO_ReturnError_t CO_new(void);
 
-
-/**
- * Initialize CAN driver
- *
- * Function must be called in the communication reset section.
- *
- * @param CANdriverState Pointer to the CAN module, passed to CO_CANmodule_init().
- * @param bitRate CAN bit rate.
- * @return #CO_ReturnError_t: CO_ERROR_NO, CO_ERROR_ILLEGAL_ARGUMENT,
- * CO_ERROR_ILLEGAL_BAUDRATE, CO_ERROR_OUT_OF_MEMORY
- */
 CO_ReturnError_t CO_CANinit(
         void                   *CANdriverState,
         uint16_t                bitRate);
 
-
-/**
- * Initialize CANopen LSS slave
- *
- * Function must be called in the communication reset section.
- *
- * @param nodeId Node ID of the CANopen device (1 ... 127) or CO_LSS_NODE_ID_ASSIGNMENT
- * @param bitRate CAN bit rate.
- * @return #CO_ReturnError_t: CO_ERROR_NO, CO_ERROR_ILLEGAL_ARGUMENT
- */
 CO_ReturnError_t CO_LSSinit(
         uint8_t                 nodeId,
         uint16_t                bitRate);
 
-
-/**
- * Initialize CANopen stack.
- *
- * Function must be called in the communication reset section.
- *
- * @param nodeId Node ID of the CANopen device (1 ... 127).
- * @return #CO_ReturnError_t: CO_ERROR_NO, CO_ERROR_ILLEGAL_ARGUMENT
- */
 CO_ReturnError_t CO_CANopenInit(
         uint8_t                 nodeId);
 
 #else /* CO_NO_LSS_SERVER == 0 */
-/**
- * Initialize CANopen stack.
- *
- * Function must be called in the communication reset section.
- *
- * @param CANdriverState Pointer to the user-defined CAN base structure, passed to CO_CANmodule_init().
- * @param nodeId Node ID of the CANopen device (1 ... 127).
- * @param bitRate CAN bit rate.
- *
- * @return #CO_ReturnError_t: CO_ERROR_NO, CO_ERROR_ILLEGAL_ARGUMENT,
- * CO_ERROR_OUT_OF_MEMORY, CO_ERROR_ILLEGAL_BAUDRATE
- */
+
 CO_ReturnError_t CO_init(
         void                   *CANdriverState,
         uint8_t                 nodeId,
@@ -323,20 +279,18 @@ CO_ReturnError_t CO_init(
 /* Helper function for NMT master *********************************************/
 CO_CANtx_t *NMTM_txBuff = 0;
 
-CO_ReturnError_t CO_sendNMTcommand(CO_t *CO_this, uint8_t command, uint8_t nodeID)
-{
-    if (NMTM_txBuff == 0)
-    {
-        /* error, CO_CANtxBufferInit() was not called for this buffer. */
-        return CO_ERROR_TX_UNCONFIGURED; /* -11 */
-    }
-    NMTM_txBuff->data[0] = command;
-    NMTM_txBuff->data[1] = nodeID;
-
-    /* Protect access to NMT operatingState and resetCommand */
-    CO_LOCK_NMT();
+    CO_ReturnError_t CO_sendNMTcommand(CO_t *CO_this, uint8_t command, uint8_t nodeID){
+        if(NMTM_txBuff == 0){
+            /* error, CO_CANtxBufferInit() was not called for this buffer. */
+            return CO_ERROR_TX_UNCONFIGURED; /* -11 */
+        }
+        NMTM_txBuff->data[0] = command;
+        NMTM_txBuff->data[1] = nodeID;
 
         CO_ReturnError_t error = CO_ERROR_NO;
+
+        /* Protect access to NMT operatingState and resetCommand */
+        CO_LOCK_NMT();
 
         /* Apply NMT command also to this node, if set so. */
         if(nodeID == 0 || nodeID == CO_this->NMT->nodeId){
@@ -446,12 +400,12 @@ CO_ReturnError_t CO_new(CO_Context_t *context)
     if(CO == NULL){    /* Use malloc only once */
         CO = &COO;
         CO->CANmodule[0]                    = (CO_CANmodule_t *)    COcalloc(1, sizeof(CO_CANmodule_t));
-        CO_CANmodule_rxArray0               = (CO_CANrx_t *)        COcalloc(norxmsgs, sizeof(CO_CANrx_t));
-        CO_CANmodule_txArray0               = (CO_CANtx_t *)        COcalloc(notxmsgs, sizeof(CO_CANtx_t));
-        /* Attention, MUST BE ALLOCATED AT ONCE HERE! *
-         * otherwise it can't be accessed like an array afterwards! */
-        CO->SDO                             = (CO_SDO_t *)          COcalloc(context->features->CO_NO_SDO_SERVER, sizeof(CO_SDO_t));        
-        CO_SDO_ODExtensions                 = (CO_OD_extension_t*)  COcalloc(context->numberOfODElements, sizeof(CO_OD_extension_t));
+        CO_CANmodule_rxArray0               = (CO_CANrx_t *)        COcalloc(CO_RXCAN_NO_MSGS, sizeof(CO_CANrx_t));
+        CO_CANmodule_txArray0               = (CO_CANtx_t *)        COcalloc(CO_TXCAN_NO_MSGS, sizeof(CO_CANtx_t));
+        for(i=0; i<CO_NO_SDO_SERVER; i++){
+            CO->SDO[i]                      = (CO_SDO_t *)          COcalloc(1, sizeof(CO_SDO_t));
+        }
+        CO_SDO_ODExtensions                 = (CO_OD_extension_t*)  COcalloc(CO_OD_NoOfElements, sizeof(CO_OD_extension_t));
         CO->em                              = (CO_EM_t *)           COcalloc(1, sizeof(CO_EM_t));
         CO->emPr                            = (CO_EMpr_t *)         COcalloc(1, sizeof(CO_EMpr_t));
         CO->NMT                             = (CO_NMT_t *)          COcalloc(1, sizeof(CO_NMT_t));
@@ -463,112 +417,31 @@ CO_ReturnError_t CO_new(CO_Context_t *context)
         for(i=0; i<CO_NO_RPDO; i++){
             CO->RPDO[i]                     = (CO_RPDO_t *)         COcalloc(1, sizeof(CO_RPDO_t));
         }
-        else
-        {
-            CO->LSSslave                    = NULL;
+        for(i=0; i<CO_NO_TPDO; i++){
+            CO->TPDO[i]                     = (CO_TPDO_t *)         COcalloc(1, sizeof(CO_TPDO_t));
         }
-        if(context->features->CO_NO_LSS_CLIENT > 0)
-        {
-            CO->LSSmaster                   = (CO_LSSmaster_t *)    COcalloc(1, sizeof(CO_LSSmaster_t));
+        CO->HBcons                          = (CO_HBconsumer_t *)   COcalloc(1, sizeof(CO_HBconsumer_t));
+        CO_HBcons_monitoredNodes            = (CO_HBconsNode_t *)   COcalloc(CO_NO_HB_CONS, sizeof(CO_HBconsNode_t));
+      #if CO_NO_LSS_SERVER == 1
+        CO->LSSslave                        = (CO_LSSslave_t *)     COcalloc(1, sizeof(CO_LSSslave_t));
+      #endif
+      #if CO_NO_LSS_CLIENT == 1
+        CO->LSSmaster                       = (CO_LSSmaster_t *)    COcalloc(1, sizeof(CO_LSSmaster_t));
+      #endif
+      #if CO_NO_SDO_CLIENT != 0
+        for(i=0; i<CO_NO_SDO_CLIENT; i++){
+            CO->SDOclient[i]                = (CO_SDOclient_t *)    COcalloc(1, sizeof(CO_SDOclient_t));
         }
-        else
-        {
-            CO->LSSmaster                   = NULL;
-        }
-        if(context->features->CO_NO_SDO_CLIENT > 0)
-        {
-            /* Attention, MUST BE ALLOCATED AT ONCE HERE! *
-             * otherwise it can't be accessed like an array afterwards! */ 
-            CO->SDOclient                   = (CO_SDOclient_t *)    COcalloc(context->features->CO_NO_SDO_CLIENT, sizeof(CO_SDOclient_t));
-        }
-        else
-        {
-            CO->SDOclient                   = NULL;
-        }
-
-        uint32_t neededBuffersize = 0;
-
-        if(context->features->CO_NO_TRACE > 0)
-        {
-
-            /* For each config'd trace in OD, we need a bufferarray of int32_t(values), uint32_t(time) and one place to store the size */
-            /* Since we don't know the number of traces in advance, we can't assign a array of pointers */
-            /* Thus there is is just one pointer of each type, that points to an allocated array of pointers which then point to each traces information */
-
-            
-            /* So first we need the number of traces to allocate the number of pointers. */
-            /* Then we iterate over each traceConfig to get the traces size to allocate memory for each trace and assign the trace's pointers and size information */
-
-            CO->trace                       = (CO_trace_t *)        COcalloc(context->features->CO_NO_TRACE, sizeof(CO_trace_t));
-
-            /* We now have the trace contexts in memory. So there is no need to save external pointers somewhere */
-            /* We can store the size directly in the trace's contexts */
-            /* We keep counting the needed amount of tracebuffers (value and time) to allocate the memory at the end. */
-            /* During trace init the memory is taken then (pointers are adjusted as needed from size information in trace contexts) */
-
-            /* Go on only if assignment worked */
-            if (CO->trace != NULL)
-            {
-                /* Get trace buffer sizes out of OD */
-                /* OD_traceConfig[i].size */
-                /*2301[2], Data Type: OD_traceConfig_t, Array[2] */
-
-                for (i = 0; i < (uint16_t)context->features->CO_NO_TRACE; i++)
-                {
-                    uint16_t wantedIndex = 0x2301 + i;
-
-                    /* Poll over OD to find OD_traceConfig[i] */
-                    for (uint16_t j = 0; j < context->numberOfODElements; j++)
-                    {
-                        if (context->usedOD[j].index == wantedIndex && context->usedOD[j].maxSubIndex > 0 && context->usedOD[j].attribute == 0 && context->usedOD[j].length == 0 && context->usedOD[j].pData != NULL)
-                        {
-                            /* Looks like this is the wanted record */
-                            CO_OD_entryRecord_t *recP = (CO_OD_entryRecord_t *)context->usedOD[j].pData;
-
-                            if (recP[0].pData != NULL)
-                            {
-                                uint8_t maxSub = *((uint8_t *)recP[0].pData);
-
-                                if (maxSub == 8) // This is the expected size
-                                {
-                                    if (recP[1].pData != NULL && recP[1].length == 4)
-                                    {
-                                        uint32_t thisBuffersize = *((uint32_t *)recP[1].pData); // subindex 1 holds needed size of the trace
-                                        neededBuffersize += thisBuffersize;
-                                        CO->trace[i].bufferSize = thisBuffersize;
-                                    }
-                                }
-                                /* Exit early, we're done here (even if data is not valid)*/
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                // Now we've got the number of buffers we need for all traces
-                uint32_t *traceTimeBuffers = (uint32_t *)COcalloc(neededBuffersize, sizeof(uint32_t));
-                int32_t *traceValueBuffers = (int32_t *)COcalloc(neededBuffersize, sizeof(int32_t));
-
-                // Check if assignment was okay */
-                if (traceTimeBuffers == NULL || traceValueBuffers == NULL)
-                {
-                    // Free stuff and mark it as faulty
-                    COfree(traceValueBuffers);
-                    COfree(traceTimeBuffers);
-                    COfree(CO->trace);
-                }
-                else
-                {
-                    /* Now assign the pointers */
-                    /* For that we count upwards */
-                    for (i = 0; i < (uint16_t)context->features->CO_NO_TRACE; i++)
-                    {
-                        CO->trace[i].timeBuffer = traceTimeBuffers;
-                        CO->trace[i].valueBuffer = traceValueBuffers;
-                        traceTimeBuffers += CO->trace[i].bufferSize;
-                        traceValueBuffers += CO->trace[i].bufferSize;
-                    }
-                }
+      #endif
+      #if CO_NO_TRACE > 0
+        for(i=0; i<CO_NO_TRACE; i++) {
+            CO->trace[i]                    = (CO_trace_t *)        COcalloc(1, sizeof(CO_trace_t));
+            CO_traceTimeBuffers[i]          = (uint32_t *)          COcalloc(OD_traceConfig[i].size, sizeof(uint32_t));
+            CO_traceValueBuffers[i]         = (int32_t *)           COcalloc(OD_traceConfig[i].size, sizeof(int32_t));
+            if(CO_traceTimeBuffers[i] != NULL && CO_traceValueBuffers[i] != NULL) {
+                CO_traceBufferSize[i] = OD_traceConfig[i].size;
+            } else {
+                CO_traceBufferSize[i] = 0;
             }
         }
 
@@ -1529,57 +1402,51 @@ void CO_delete(
     CO_CANsetConfigurationMode(CANdriverState);
     CO_CANmodule_disable(CO->CANmodule[0]);
 
-    // Cleaning the trace stuff is easy since all is allocated at once and thus can be freed at once
-    if(context->features->CO_NO_TRACE > 0)
-    {
-        COfree(CO->trace[0].timeBuffer);
-        COfree(CO->trace[0].valueBuffer);
-        COfree(CO->trace);
-    }
-
-    // Cleaning SDOClients is easy since all is allocated at once and thus can be freed at once
-    COfree(CO->SDOclient);    
-
-    if (context->features->CO_NO_LSS_SERVER > 0)
-    {
-        COfree(CO->LSSslave);
-    }
-    if (context->features->CO_NO_LSS_CLIENT > 0)
-    {
-        COfree(CO->LSSmaster);
-    }
-    // Cleaning CO_HBcons_monitoredNodes is easy since all is allocated at once and thus can be freed at once
+#ifndef CO_USE_GLOBALS
+  #if CO_NO_TRACE > 0
+      for(i=0; i<CO_NO_TRACE; i++) {
+          COfree(CO->trace[i]);
+          COfree(CO_traceTimeBuffers[i]);
+          COfree(CO_traceValueBuffers[i]);
+      }
+  #endif
+  #if CO_NO_SDO_CLIENT != 0
+      for(i=0; i<CO_NO_SDO_CLIENT; i++) {
+          COfree(CO->SDOclient[i]);
+      }
+  #endif
+  #if CO_NO_LSS_SERVER == 1
+    COfree(CO->LSSslave);
+  #endif
+  #if CO_NO_LSS_CLIENT == 1
+    COfree(CO->LSSmaster);
+  #endif
     COfree(CO_HBcons_monitoredNodes);
     COfree(CO->HBcons);
-    // Cleaning RPDO is easy since all is allocated at once and thus can be freed at once
-    COfree(CO->RPDO);
-    // Cleaning TPDO is easy since all is allocated at once and thus can be freed at once
-    COfree(CO->TPDO);
-    
-  #if CO_NO_SYNC == 1
+    for(i=0; i<CO_NO_RPDO; i++){
+        COfree(CO->RPDO[i]);
+    }
+    for(i=0; i<CO_NO_TPDO; i++){
+        COfree(CO->TPDO[i]);
+    }
     COfree(CO->SYNC);
-  #endif
-  #if CO_NO_TIME == 1
-    COfree(CO->TIME);
-  #endif
     COfree(CO->NMT);
     COfree(CO->emPr);
     COfree(CO->em);
-    // Cleaning SDO and extensions is easy since all is allocated at once and thus can be freed at once
     COfree(CO_SDO_ODExtensions);
-    COfree(CO->SDO);
-    
-    // Cleaning the arrays is easy since all is allocated at once and thus can be freed at once
+    for(i=0; i<CO_NO_SDO_SERVER; i++){
+        COfree(CO->SDO[i]);
+    }
     COfree(CO_CANmodule_txArray0);
     COfree(CO_CANmodule_rxArray0);
     COfree(CO->CANmodule[0]);
+	COfree(CO->TIME);
     CO = NULL;
 }
 
 /******************************************************************************/
 CO_NMT_reset_cmd_t CO_process(
         CO_t                   *CO_this,
-        CO_Context_t           *context,
         uint16_t                timeDifference_ms,
         uint16_t               *timerNext_ms)
 {
@@ -1609,7 +1476,7 @@ CO_NMT_reset_cmd_t CO_process(
 
     for(i=0; i<context->features->CO_NO_SDO_SERVER; i++){
         CO_SDO_process(
-               &CO_this->SDO[i],
+                CO_this->SDO[i],
                 NMTisPreOrOperational,
                 timeDifference_ms,
                 1000,
@@ -1650,16 +1517,14 @@ CO_NMT_reset_cmd_t CO_process(
 
 
 /******************************************************************************/
-#if CO_NO_SYNC == 1
-bool_t CO_process_SYNC(
+bool_t CO_process_SYNC_RPDO(
         CO_t                   *CO_this,
-        uint32_t                timeDifference_us,
-        CO_Context_t           *context)
+        uint32_t                timeDifference_us)
 {
     uint16_t i;
     bool_t syncWas = false;
 
-    switch(CO_SYNC_process(CO_this->SYNC, timeDifference_us, *synchronousWindowLength)){
+    switch(CO_SYNC_process(CO_this->SYNC, timeDifference_us, OD_synchronousWindowLength)){
         case 1:     //immediately after the SYNC message
             syncWas = true;
             break;
@@ -1682,7 +1547,7 @@ void CO_process_RPDO(
     uint16_t i;
 
     for(i=0; i<CO_NO_RPDO; i++){
-        CO_RPDO_process(&CO_this->RPDO[i], syncWas);
+        CO_RPDO_process(CO_this->RPDO[i], syncWas);
     }
 }
 
@@ -1697,10 +1562,8 @@ void CO_process_TPDO(
     uint16_t i;
 
     /* Verify PDO Change Of State and process PDOs */
-    for (i = 0; i < context->features->CO_NO_TPDO; i++)
-    {
-        if (!CO_this->TPDO[i].sendRequest)
-            CO_this->TPDO[i].sendRequest = CO_TPDOisCOS(&CO_this->TPDO[i]);
-        CO_TPDO_process(&CO_this->TPDO[i], CO_this->SYNC, syncWas, timeDifference_us);
+    for(i=0; i<CO_NO_TPDO; i++){
+        if(!CO_this->TPDO[i]->sendRequest) CO_this->TPDO[i]->sendRequest = CO_TPDOisCOS(CO_this->TPDO[i]);
+        CO_TPDO_process(CO_this->TPDO[i], CO_this->SYNC, syncWas, timeDifference_us);
     }
 }

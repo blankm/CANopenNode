@@ -171,6 +171,10 @@ extern "C" {
     #define CO_LOCK_NMT()       /**< Lock critical section when accessing NMT Object asyncronous */
     #define CO_UNLOCK_NMT()     /**< Lock critical section when accessing NMT Object asyncronous */
 
+
+    #define CO_LOCK_NMT()       /**< Lock critical section when accessing NMT Object asyncronous */
+    #define CO_UNLOCK_NMT()     /**< Lock critical section when accessing NMT Object asyncronous */
+
 /** @} */
 
 /**

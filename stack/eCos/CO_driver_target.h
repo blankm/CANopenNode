@@ -121,6 +121,7 @@ extern "C"
 #define COfree(loc) free(loc)
 /** @} */
 
+
 /* Data types */
 typedef unsigned char           bool_t;
 typedef cyg_uint8               uint8_t;
