@@ -386,9 +386,9 @@ CO_ReturnError_t CO_sendNMTcommand(CO_t *CO_this, uint8_t command, uint8_t nodeI
         {
             error = CO_CANsend(CO_this->CANmodule[0], NMTM_txBuff); /* 0 = success */
         }
+
         CO_UNLOCK_NMT();
-			
-		return error;
+        return error;
     }
 }
 
