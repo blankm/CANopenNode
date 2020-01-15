@@ -361,26 +361,8 @@ CO_ReturnError_t CO_sendNMTcommand(CO_t *CO_this, uint8_t command, uint8_t nodeI
                 default:
                     error = CO_ERROR_ILLEGAL_ARGUMENT;
                     break;
-
-            }
-            break;
-        case CO_NMT_ENTER_STOPPED:
-            CO_this->NMT->operatingState = CO_NMT_STOPPED;
-            break;
-        case CO_NMT_ENTER_PRE_OPERATIONAL:
-            CO_this->NMT->operatingState = CO_NMT_PRE_OPERATIONAL;
-            break;
-        case CO_NMT_RESET_NODE:
-            CO_this->NMT->resetCommand = CO_RESET_APP;
-            break;
-        case CO_NMT_RESET_COMMUNICATION:
-            CO_this->NMT->resetCommand = CO_RESET_COMM;
-            break;
-        default:
-            error = CO_ERROR_ILLEGAL_ARGUMENT;
-            break;
+                }
         }
-    }
 
         if(error == CO_ERROR_NO)
         {
